@@ -25,6 +25,7 @@ export const session = sqliteTable("session", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  activeOrganizationId: text("active_organization_id"),
 });
 
 export const account = sqliteTable("account", {
@@ -81,6 +82,7 @@ export const invitation = sqliteTable("invitation", {
   status: text("status").notNull().default("pending"),
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
   inviterId: text("inviter_id").notNull().references(() => user.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 // --- app tables ----------------------------------------------------------
