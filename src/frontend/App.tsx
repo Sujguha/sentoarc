@@ -6,7 +6,9 @@ import SignUp from "./pages/SignUp";
 import AppShell from "./pages/AppShell";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
-import { LegalPlaceholder } from "./pages/legal/LegalPlaceholder";
+import Impressum from "./pages/legal/Impressum";
+import Datenschutz from "./pages/legal/Datenschutz";
+import Terms from "./pages/legal/Terms";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export default function App() {
@@ -40,9 +42,9 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/legal/impressum" element={<LegalPlaceholder title="Impressum" />} />
-      <Route path="/legal/datenschutz" element={<LegalPlaceholder title="Datenschutzerklärung" />} />
-      <Route path="/legal/terms" element={<LegalPlaceholder title="Terms" />} />
+      <Route path="/legal/impressum" element={<Impressum />} />
+      <Route path="/legal/datenschutz" element={<Datenschutz />} />
+      <Route path="/legal/terms" element={<Terms />} />
     </Routes>
   );
 }
