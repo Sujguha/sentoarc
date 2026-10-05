@@ -26,3 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pending legal review.
 - `GET /api/usage`, `POST /api/contact-sales`, `GET /api/admin/ping`,
   `GET /api/health`.
+- `.github/workflows/deploy.yml`: on push to `main`, applies D1 migrations
+  and deploys to Cloudflare Workers using a repo-level `CLOUDFLARE_API_TOKEN`
+  secret and `CLOUDFLARE_ACCOUNT_ID` variable — no token ever shared outside
+  GitHub's own secret store.
