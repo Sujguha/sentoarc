@@ -11,7 +11,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "sentoarc-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "67e4b297-1e67-471e-aa43-85321cdd47f5"
 
 [[r2_buckets]]
 binding = "PACKAGES_BUCKET"
