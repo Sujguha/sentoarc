@@ -136,7 +136,7 @@ jobs:
             local t0 t1 t2
             t0=$(date +%s)
             local upload_code
-            upload_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+            upload_code=$(curl -s -b cookies.txt -o /dev/null -w "%{http_code}" -X PUT \
               "${{ inputs.base_url }}$upload_url" --data-binary "@$file")
             t1=$(date +%s)
             local upload_s=$((t1 - t0))
@@ -189,6 +189,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -n "${TEST_EMAIL:-}" ]; then
+            # package/package_issue rows cascade-delete with their job (see migrations/0001_init.sql).
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM job WHERE created_by_user_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
             npx wrangler d1 execute sentoarc-db --remote \
               --command "DELETE FROM subscription WHERE owner_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
             npx wrangler d1 execute sentoarc-db --remote \
