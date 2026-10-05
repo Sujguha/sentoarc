@@ -1,4 +1,4 @@
-const SENDGRID_ENDPOINT = "https://api.sendgrid.net/v3/mail/send";
+const SENDGRID_ENDPOINT = "https://api.sendgrid.com/v3/mail/send";
 
 export interface SendEmailOptions {
   to: string;
