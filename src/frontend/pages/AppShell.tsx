@@ -21,6 +21,7 @@ interface PackageDetail {
   id: string;
   originalFilename: string;
   status: string;
+  inputFormat: "scorm" | "pdf" | "mp4" | "pptx" | "html" | null;
   scormVersionIn: string | null;
   scormVersionOut: string | null;
   errorMessage: string | null;
@@ -34,13 +35,23 @@ interface JobDetail {
 
 const TERMINAL_JOB_STATUSES = new Set(["completed", "completed_with_errors", "failed"]);
 
+const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
+
 const ERROR_MESSAGES: Record<string, string> = {
-  filename_must_be_zip: "Please choose a .zip file.",
+  unsupported_file_type: "Please choose a SCORM ZIP, PDF, MP4, PPTX, or HTML file.",
   free_limit_reached: "You've used all of your free uploads. Upgrade to Pro for unlimited uploads.",
   package_too_large: "That file is too large for the current plan limit.",
   size_bytes_required: "Couldn't read the file size — please try again.",
   already_uploaded: "This upload has already been submitted.",
   empty_upload: "The file appears to be empty.",
+};
+
+const INPUT_FORMAT_LABELS: Record<string, string> = {
+  scorm: "SCORM",
+  pdf: "PDF",
+  mp4: "Video",
+  pptx: "PowerPoint",
+  html: "HTML",
 };
 
 function friendlyError(code: string | undefined): string {
@@ -111,8 +122,9 @@ export default function AppShell() {
     e.target.value = ""; // allow re-selecting the same file name after an error
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      setUploadError("Please choose a .zip file.");
+    const lower = file.name.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+      setUploadError(ERROR_MESSAGES.unsupported_file_type!);
       return;
     }
 
@@ -155,18 +167,27 @@ export default function AppShell() {
       <section className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-bold text-slate-900">Upload a package</h1>
         <p className="mt-2 text-slate-600">
-          Upload the SCORM ZIP that SAP Enable Now exported. We'll validate it, fix what we safely can, and give you
-          back a package ready for WalkMe Learning Arc.
+          Already have a SCORM ZIP from SAP Enable Now? We'll validate it and fix what we safely can. Have a PDF,
+          video, slide deck, or web page instead? We'll package it into a SCORM 1.2 course ready for WalkMe
+          Learning Arc.
         </p>
 
         <div className="mt-6 rounded-lg border-2 border-dashed border-slate-300 p-8 text-center">
-          <input id="file-input" type="file" accept=".zip" className="hidden" onChange={handleFileChange} disabled={uploading} />
+          <input
+            id="file-input"
+            type="file"
+            accept={ALLOWED_EXTENSIONS.join(",")}
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={uploading}
+          />
           <label
             htmlFor="file-input"
             className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
           >
-            {uploading ? "Uploading…" : "Choose a SCORM ZIP"}
+            {uploading ? "Uploading…" : "Choose a file"}
           </label>
+          <p className="mt-2 text-xs text-slate-400">SCORM ZIP, PDF, MP4, PPTX, or HTML</p>
           {selectedFile && !uploadError && (
             <p className="mt-3 text-sm text-slate-500">{selectedFile.name}</p>
           )}
@@ -183,10 +204,18 @@ export default function AppShell() {
                     <span className="font-medium text-slate-900">{p.originalFilename}</span>
                     <StatusBadge status={p.status === "pending" || p.status === "queued" ? jobDetail.job.status : p.status} />
                   </div>
-                  {p.scormVersionIn && (
+                  {p.inputFormat && (
                     <p className="mt-1 text-xs text-slate-500">
-                      SCORM {p.scormVersionIn}
-                      {p.scormVersionOut && p.scormVersionOut !== p.scormVersionIn ? ` → ${p.scormVersionOut}` : ""}
+                      {p.inputFormat === "scorm" ? (
+                        <>
+                          SCORM {p.scormVersionIn}
+                          {p.scormVersionOut && p.scormVersionOut !== p.scormVersionIn ? ` → ${p.scormVersionOut}` : ""}
+                        </>
+                      ) : (
+                        <>
+                          {INPUT_FORMAT_LABELS[p.inputFormat] ?? p.inputFormat} → packaged as SCORM {p.scormVersionOut}
+                        </>
+                      )}
                     </p>
                   )}
                   {p.issues.length > 0 && (
@@ -214,7 +243,7 @@ export default function AppShell() {
                       href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`}
                       className="mt-3 inline-block rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white"
                     >
-                      Download fixed ZIP
+                      Download SCORM package
                     </a>
                   )}
                 </div>

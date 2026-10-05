@@ -3,6 +3,32 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-10-05
+
+### Added
+
+- Accept non-SCORM uploads (PDF, MP4, PPTX, HTML/ZIP of web content) and
+  auto-package them into a SCORM 1.2 course instead of rejecting them:
+  - `detect.ts`: content-sniffs the upload (magic bytes / ZIP structure)
+    rather than trusting the filename extension.
+  - `scormapi-runtime.ts`: a standard SCORM 1.2 API-discovery JS shim
+    (walks the parent/opener window chain for `window.API`), shared by
+    every generated launch page.
+  - `wrapper.ts`: generates a full package (manifest + launch page +
+    content) per type — video auto-completes on the `ended` event,
+    everything else uses a manual "Mark as Complete" button. PPTX does
+    **not** render slides (that needs a real conversion engine, a new
+    dependency decision) — v1 links out to download the file instead.
+  - Every wrapper's output is validated against our own existing SCORM
+    validator in tests (dogfooding), the same bar a real SEN export is
+    held to.
+  - `package.input_format` tracks what the upload actually was, shown in
+    the report.
+  - Upload size cap raised to 100MB to accommodate video.
+- Landing page and `/app` copy broadened: SEN SCORM fixing is still the
+  lead, but packaging arbitrary content into SCORM is now a stated
+  capability, not just a fallback.
+
 ## [0.2.0] - 2026-10-05
 
 ### Added

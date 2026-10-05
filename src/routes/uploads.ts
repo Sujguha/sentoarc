@@ -15,13 +15,28 @@ export const uploadsRoute = new Hono<AppBindings>();
 // under the size cap here, so the simpler path is the right trade-off
 // for now. Revisit with presigned uploads if bulk/larger files land.
 
+// This is a filename-extension allowlist, not the actual format check —
+// the queue consumer sniffs real file content via detectFileType()
+// before processing, so a mislabeled extension is rejected there, not
+// trusted here.
+const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
+
+function extensionOf(filename: string): string | null {
+  const lower = filename.toLowerCase();
+  return ALLOWED_EXTENSIONS.find((ext) => lower.endsWith(ext)) ?? null;
+}
+
 uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   const user = c.get("user");
   const tier = c.get("planTier");
   const body = await c.req.json<{ filename?: string; sizeBytes?: number }>().catch(() => null);
+  if (!body?.filename) {
+    return c.json({ error: "unsupported_file_type", allowed: ALLOWED_EXTENSIONS }, 400);
+  }
 
-  if (!body?.filename || !body.filename.toLowerCase().endsWith(".zip")) {
-    return c.json({ error: "filename_must_be_zip" }, 400);
+  const extension = extensionOf(body.filename);
+  if (!extension) {
+    return c.json({ error: "unsupported_file_type", allowed: ALLOWED_EXTENSIONS }, 400);
   }
   const sizeBytes = Number(body.sizeBytes);
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
@@ -55,7 +70,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   const now = new Date();
   const jobId = crypto.randomUUID();
   const packageId = crypto.randomUUID();
-  const r2KeyUpload = `uploads/user/${user.id}/${jobId}/${packageId}/original.zip`;
+  const r2KeyUpload = `uploads/user/${user.id}/${jobId}/${packageId}/original${extension}`;
 
   await db.insert(job).values({
     id: jobId,

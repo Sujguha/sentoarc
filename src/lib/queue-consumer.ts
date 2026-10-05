@@ -1,9 +1,24 @@
 import { eq, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db/client";
 import { job, pkg, packageIssue } from "./db/schema";
-import { safeUnzip, ZipSecurityError } from "./scorm/zip-utils";
+import { buildZip } from "./scorm/zip-utils";
 import { fixPackage, type PackageIssue } from "./scorm/fixer";
+import { detectFileType, type DetectedFileType } from "./scorm/detect";
+import { wrapAsScorm } from "./scorm/wrapper";
 import type { Env, ProcessingQueueMessage } from "../types/env";
+
+const INPUT_FORMAT_BY_DETECTED_TYPE: Record<Exclude<DetectedFileType, "unknown">, "scorm" | "pdf" | "mp4" | "pptx" | "html"> = {
+  "scorm-zip": "scorm",
+  pdf: "pdf",
+  mp4: "mp4",
+  pptx: "pptx",
+  html: "html",
+  "html-zip": "html",
+};
+
+function deriveFixedKey(uploadKey: string): string {
+  return uploadKey.replace(/\/[^/]+$/, "/fixed.zip");
+}
 
 export async function processPackageMessage(message: ProcessingQueueMessage, env: Env): Promise<void> {
   if (message.type !== "process") {
@@ -16,12 +31,20 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
 
   await db.update(pkg).set({ status: "processing", updatedAt: now() }).where(eq(pkg.id, message.packageId));
 
+  const [pkgRow] = await db
+    .select({ originalFilename: pkg.originalFilename })
+    .from(pkg)
+    .where(eq(pkg.id, message.packageId))
+    .limit(1);
+  const originalFilename = pkgRow?.originalFilename ?? "package";
+
   const object = await env.PACKAGES_BUCKET.get(message.r2Key);
   if (!object) {
     await finishPackage(db, message, {
       status: "failed",
       errorMessage: "Uploaded file was not found in storage.",
       issues: [{ severity: "error", code: "UPLOAD_MISSING", message: "Uploaded file was not found in storage.", fixApplied: false }],
+      inputFormat: null,
       scormVersionIn: null,
       scormVersionOut: null,
       r2KeyFixed: null,
@@ -30,16 +53,15 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   }
 
   const bytes = new Uint8Array(await object.arrayBuffer());
+  const detection = detectFileType(bytes);
 
-  let unzippedFiles;
-  try {
-    unzippedFiles = safeUnzip(bytes).files;
-  } catch (err) {
-    const message_ = err instanceof ZipSecurityError ? err.message : "The uploaded file is not a valid ZIP archive.";
+  if (detection.type === "unknown") {
+    const msg = "This file isn't a recognized format (SCORM ZIP, PDF, MP4, PPTX, or HTML) and couldn't be processed.";
     await finishPackage(db, message, {
       status: "failed",
-      errorMessage: message_,
-      issues: [{ severity: "error", code: "ZIP_REJECTED", message: message_, fixApplied: false }],
+      errorMessage: msg,
+      issues: [{ severity: "error", code: "UNSUPPORTED_FILE_TYPE", message: msg, fixApplied: false }],
+      inputFormat: null,
       scormVersionIn: null,
       scormVersionOut: null,
       r2KeyFixed: null,
@@ -47,20 +69,65 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
     return;
   }
 
-  const result = fixPackage(unzippedFiles);
+  const inputFormat = INPUT_FORMAT_BY_DETECTED_TYPE[detection.type];
 
-  let r2KeyFixed: string | null = null;
-  if (result.fixedZip) {
-    r2KeyFixed = message.r2Key.replace(/original\.zip$/, "fixed.zip");
-    await env.PACKAGES_BUCKET.put(r2KeyFixed, result.fixedZip);
+  if (detection.type === "scorm-zip") {
+    const result = fixPackage(detection.files!);
+
+    let r2KeyFixed: string | null = null;
+    if (result.fixedZip) {
+      r2KeyFixed = deriveFixedKey(message.r2Key);
+      await env.PACKAGES_BUCKET.put(r2KeyFixed, result.fixedZip);
+    }
+
+    await finishPackage(db, message, {
+      status: result.status,
+      errorMessage: result.status === "failed" ? summarizeErrors(result.issues) : null,
+      issues: result.issues,
+      inputFormat,
+      scormVersionIn: result.scormVersionIn,
+      scormVersionOut: result.scormVersionOut,
+      r2KeyFixed,
+    });
+    return;
   }
 
+  // Non-SCORM input: generate a SCORM 1.2 wrapper around it.
+  let wrapped;
+  try {
+    wrapped = wrapAsScorm(detection.type, bytes, originalFilename, detection.files);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to package this file as SCORM.";
+    await finishPackage(db, message, {
+      status: "failed",
+      errorMessage: msg,
+      issues: [{ severity: "error", code: "WRAP_FAILED", message: msg, fixApplied: false }],
+      inputFormat,
+      scormVersionIn: null,
+      scormVersionOut: null,
+      r2KeyFixed: null,
+    });
+    return;
+  }
+
+  const fixedZip = buildZip(wrapped.files);
+  const r2KeyFixed = deriveFixedKey(message.r2Key);
+  await env.PACKAGES_BUCKET.put(r2KeyFixed, fixedZip);
+
   await finishPackage(db, message, {
-    status: result.status,
-    errorMessage: result.status === "failed" ? summarizeErrors(result.issues) : null,
-    issues: result.issues,
-    scormVersionIn: result.scormVersionIn,
-    scormVersionOut: result.scormVersionOut,
+    status: "fixed",
+    errorMessage: null,
+    issues: [
+      {
+        severity: "info",
+        code: "WRAPPED_AS_SCORM",
+        message: `This file wasn't a SCORM package (detected as ${inputFormat.toUpperCase()}); a SCORM 1.2 wrapper was generated around it.`,
+        fixApplied: true,
+      },
+    ],
+    inputFormat,
+    scormVersionIn: null,
+    scormVersionOut: "1.2",
     r2KeyFixed,
   });
 }
@@ -69,6 +136,7 @@ interface FinishArgs {
   status: "pass" | "fixed" | "failed";
   errorMessage: string | null;
   issues: PackageIssue[];
+  inputFormat: "scorm" | "pdf" | "mp4" | "pptx" | "html" | null;
   scormVersionIn: string | null;
   scormVersionOut: string | null;
   r2KeyFixed: string | null;
@@ -82,6 +150,7 @@ async function finishPackage(db: Db, message: Extract<ProcessingQueueMessage, { 
     .set({
       status: args.status,
       r2KeyFixed: args.r2KeyFixed,
+      inputFormat: args.inputFormat,
       scormVersionIn: args.scormVersionIn,
       scormVersionOut: args.scormVersionOut,
       errorMessage: args.errorMessage,

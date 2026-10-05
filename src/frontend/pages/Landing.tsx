@@ -19,13 +19,13 @@ function Hero() {
   return (
     <section className="mx-auto max-w-4xl px-6 py-20 text-center">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-        Get your SAP Enable Now content into WalkMe Learning Arc —
+        Get your training content into WalkMe Learning Arc —
         <span className="text-slate-500"> without the SCORM headaches</span>
       </h1>
       <p className="mt-6 text-lg text-slate-600">
-        Upload the SCORM package SAP Enable Now exported. SENtoArc validates
-        it, fixes what it safely can, and hands you back a package WalkMe
-        Learning Arc will actually track correctly.
+        Already have a SCORM package from SAP Enable Now? We validate it and fix what we safely can. Have a PDF,
+        video, slide deck, or web page instead? We package it into a SCORM course for you. Either way, you get a
+        package WalkMe Learning Arc will actually track correctly.
       </p>
       <div className="mt-8 flex justify-center gap-4">
         <Link to="/sign-up" className="rounded-md bg-slate-900 px-5 py-2.5 text-white">
@@ -43,7 +43,7 @@ function Problem() {
   return (
     <section className="mx-auto max-w-4xl px-6 py-12">
       <h2 className="text-2xl font-semibold text-slate-900">
-        SAP Enable Now exports don't import cleanly
+        SAP Enable Now exports don't import cleanly — and not everything is SCORM to begin with
       </h2>
       <p className="mt-4 text-slate-600">
         SAP Enable Now can export learning packages as SCORM, but WalkMe
@@ -59,16 +59,21 @@ function Problem() {
         </code>
         so completion is never recorded.
       </p>
+      <p className="mt-4 text-slate-600">
+        And plenty of useful training material was never SCORM at all — a PDF guide, a recorded walkthrough video,
+        a slide deck, a one-off web page. Getting any of that into WalkMe Learning Arc normally means repackaging
+        it by hand. SENtoArc does that part too.
+      </p>
     </section>
   );
 }
 
 function HowItWorks() {
   const steps = [
-    { title: "Upload", body: "Drop in the SCORM ZIP your SEN export produced." },
-    { title: "Validate", body: "We check SCORM version, manifest structure, launch file, and scormtype." },
+    { title: "Upload", body: "A SCORM ZIP from SEN, or a PDF, video, slide deck, or web page." },
+    { title: "Validate or package", body: "SCORM gets checked for version, manifest, launch file, and scormtype issues. Everything else gets built into a fresh SCORM 1.2 course." },
     { title: "Auto-fix", body: "Safe fixes are applied automatically; anything risky is flagged instead of guessed." },
-    { title: "Download", body: "Get back a fixed ZIP plus a per-package migration report." },
+    { title: "Download", body: "Get back a SCORM package ready for WalkMe, plus a per-package report." },
   ];
   return (
     <section className="mx-auto max-w-4xl px-6 py-12">
@@ -106,7 +111,11 @@ function Faq() {
   const items = [
     {
       q: "What exactly do I upload?",
-      a: "The SCORM ZIP that SAP Enable Now itself exported. SENtoArc doesn't read SEN's internal workspace format, only its SCORM output.",
+      a: "A SCORM ZIP that SAP Enable Now itself exported (we don't read SEN's internal workspace format, only its SCORM output), or a PDF, MP4 video, PPTX, or HTML file to be packaged into SCORM from scratch.",
+    },
+    {
+      q: "Does PDF/video/slide packaging look the same as a real SCORM course?",
+      a: "It's a simple, single-screen launch page that embeds your content and tracks completion — for video, automatically when it ends; for everything else, with a Mark Complete button. PowerPoint files currently link out for download rather than rendering slide-by-slide in the browser.",
     },
     {
       q: "Can every package be auto-fixed?",
