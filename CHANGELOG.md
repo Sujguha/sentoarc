@@ -31,9 +31,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     embedded as STORED zip entries instead of being wastefully deflated
     again — that redundant compression pass was the other half of the
     measured CPU blowup (hit on the 95MB PDF wrap case specifically).
-  - `wrangler.toml`: explicit `limits.cpu_ms = 30000` as additional
-    margin, now that the hot path is cheap by design rather than by
-    headroom.
+  - Tried adding an explicit `limits.cpu_ms` in `wrangler.toml` as extra
+    margin, but Cloudflare rejected the deploy: CPU limits require a
+    paid Workers plan, and this account is on the Free plan. Reverted —
+    the streaming rewrite above is what actually fixes this, not a
+    configured limit, so it isn't needed.
   - Re-running the same perf-test cases against this fix is the next
     step, to confirm the 30MB/95MB SCORM cases and the 95MB PDF wrap case
     now complete.
