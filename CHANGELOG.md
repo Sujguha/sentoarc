@@ -3,6 +3,20 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-10-05
+
+### Added
+
+- "Open WalkMe Learning Arc" button next to each completed package's
+  download, opening WalkMe's own app in a new tab so the next step (drag
+  the downloaded file into Import SCORM) needs no menu-hunting. Links to
+  the account base URL only (`app.learningarc.com`) — not a deep link to
+  the Assets/Import-SCORM screen itself, since that exact path hasn't
+  been confirmed from a real account. No automated upload: WalkMe has no
+  confirmed public API for this and credential-based UI automation was
+  explicitly ruled out (ToS risk, credential-storage liability, breaks on
+  every WalkMe UI change, incompatible with SSO/MFA anyway).
+
 ## [0.3.0] - 2026-10-05
 
 ### Added

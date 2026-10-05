@@ -46,6 +46,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   empty_upload: "The file appears to be empty.",
 };
 
+// We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
+// WalkMe's own app so the user can drag the downloaded file in themselves.
+// Only the account base URL is known for certain; update this once a
+// specific Assets/Import-SCORM page URL is confirmed from a real account.
+const WALKME_LEARNING_ARC_URL = "https://app.learningarc.com";
+
 const INPUT_FORMAT_LABELS: Record<string, string> = {
   scorm: "SCORM",
   pdf: "PDF",
@@ -239,12 +245,27 @@ export default function AppShell() {
                     </ul>
                   )}
                   {(p.status === "pass" || p.status === "fixed") && (
-                    <a
-                      href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`}
-                      className="mt-3 inline-block rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white"
-                    >
-                      Download SCORM package
-                    </a>
+                    <div className="mt-3 flex items-center gap-2">
+                      <a
+                        href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`}
+                        className="inline-block rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white"
+                      >
+                        Download SCORM package
+                      </a>
+                      <a
+                        href={WALKME_LEARNING_ARC_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-4 py-1.5 text-sm font-medium text-indigo-700"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <path d="M15 3h6v6" />
+                          <path d="M10 14 21 3" />
+                        </svg>
+                        Open WalkMe Learning Arc
+                      </a>
+                    </div>
                   )}
                 </div>
               ))}
