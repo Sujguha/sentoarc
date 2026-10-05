@@ -1,0 +1,56 @@
+name: E2E smoke test (auth)
+
+# One-off, manually-triggered: exercises sign-up against the live
+# deployment to confirm better-auth + SendGrid + D1 + the session cookie
+# all actually work together end to end. Does not touch any secrets in
+# its own config; the password is generated at runtime and never stored.
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Email to sign up with (use a +alias you control)"
+        required: true
+        default: "sujoy.guha2+test@gmail.com"
+      base_url:
+        description: "Deployed app base URL"
+        required: true
+        default: "https://sentoarc.sujoy-guha2.workers.dev"
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sign up
+        run: |
+          PASSWORD="Test-$(openssl rand -hex 8)!A1"
+          echo "Signing up ${{ inputs.email }} against ${{ inputs.base_url }}"
+          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" -c cookies.txt \
+            -X POST "${{ inputs.base_url }}/api/auth/sign-up/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"Smoke Test\",\"email\":\"${{ inputs.email }}\",\"password\":\"$PASSWORD\"}")
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body:"
+          cat response.json
+          echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Sign-up failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Call authenticated /api/usage with the session cookie
+        run: |
+          HTTP_CODE=$(curl -s -o usage.json -w "%{http_code}" -b cookies.txt \
+            "${{ inputs.base_url }}/api/usage")
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body:"
+          cat usage.json
+          echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Authenticated /api/usage call failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Health check
+        run: |
+          curl -sf "${{ inputs.base_url }}/api/health" | tee health.json
+          echo ""
