@@ -1,0 +1,173 @@
+name: E2E smoke test (upload -> validate -> fix -> download)
+
+# One-off, manually-triggered: exercises the full pipeline against the
+# live deployment with a real (tiny, valid) SCORM package. Verifies the
+# test user's email via `wrangler d1 execute` -- the same end state a
+# real inbox click produces -- rather than weakening requireEmailVerification
+# in the app itself for the sake of testing.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployed app base URL"
+        required: true
+        default: "https://sentoarc.sujoy-guha2.workers.dev"
+
+jobs:
+  upload-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build a minimal valid SCORM 1.2 package
+        run: |
+          mkdir -p /tmp/pkg
+          cat > /tmp/pkg/imsmanifest.xml <<'XML'
+          <?xml version="1.0" standalone="no" ?>
+          <manifest identifier="E2E-UPLOAD-TEST"
+                    version="1"
+                    xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+                    xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+            <metadata>
+              <schema>ADL SCORM</schema>
+              <schemaversion>1.2</schemaversion>
+            </metadata>
+            <organizations default="ORG-1">
+              <organization identifier="ORG-1">
+                <title>E2E Upload Test</title>
+                <item identifier="ITEM-1" identifierref="RES-1">
+                  <title>Lesson 1</title>
+                </item>
+              </organization>
+            </organizations>
+            <resources>
+              <resource identifier="RES-1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+                <file href="index.html"/>
+              </resource>
+            </resources>
+          </manifest>
+          XML
+          echo "<html><body>e2e test content</body></html>" > /tmp/pkg/index.html
+          (cd /tmp/pkg && zip -r /tmp/package.zip . ) > /dev/null
+          ls -la /tmp/package.zip
+
+      - name: Sign up and verify the test account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          TEST_EMAIL="sujoy.guha2+e2e-upload-$(date +%s)@gmail.com"
+          PASSWORD="Test-$(openssl rand -hex 8)!A1"
+          echo "TEST_EMAIL=$TEST_EMAIL" >> "$GITHUB_ENV"
+          echo "TEST_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
+
+          SIGNUP_CODE=$(curl -s -o signup.json -w "%{http_code}" \
+            -X POST "${{ inputs.base_url }}/api/auth/sign-up/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"E2E Upload Test\",\"email\":\"$TEST_EMAIL\",\"password\":\"$PASSWORD\"}")
+          echo "Sign-up status: $SIGNUP_CODE"; cat signup.json; echo ""
+          [ "$SIGNUP_CODE" = "200" ] || { echo "::error::Sign-up failed"; exit 1; }
+
+          npx wrangler d1 execute sentoarc-db --remote \
+            --command "UPDATE user SET email_verified = 1 WHERE email = '$TEST_EMAIL'"
+
+          SIGNIN_CODE=$(curl -s -o signin.json -w "%{http_code}" -c cookies.txt \
+            -X POST "${{ inputs.base_url }}/api/auth/sign-in/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$PASSWORD\"}")
+          echo "Sign-in status: $SIGNIN_CODE"; cat signin.json; echo ""
+          [ "$SIGNIN_CODE" = "200" ] || { echo "::error::Sign-in failed after verification"; exit 1; }
+
+      - name: Upload the package and wait for processing (with live Worker logs)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          SIZE_BYTES=$(stat -c%s /tmp/package.zip)
+
+          npx wrangler tail sentoarc --format pretty > tail.log 2>&1 &
+          TAIL_PID=$!
+          sleep 6
+
+          INIT_CODE=$(curl -s -o init.json -w "%{http_code}" -b cookies.txt \
+            -X POST "${{ inputs.base_url }}/api/uploads/init" \
+            -H "Content-Type: application/json" \
+            -d "{\"filename\":\"package.zip\",\"sizeBytes\":$SIZE_BYTES}")
+          echo "Init status: $INIT_CODE"; cat init.json; echo ""
+          [ "$INIT_CODE" = "200" ] || { echo "::error::uploads/init failed"; kill "$TAIL_PID" 2>/dev/null; cat tail.log; exit 1; }
+
+          JOB_ID=$(jq -r .jobId init.json)
+          PACKAGE_ID=$(jq -r .packageId init.json)
+          UPLOAD_URL=$(jq -r .uploadUrl init.json)
+          echo "JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
+          echo "PACKAGE_ID=$PACKAGE_ID" >> "$GITHUB_ENV"
+
+          PUT_CODE=$(curl -s -o put.json -w "%{http_code}" -b cookies.txt \
+            -X PUT "${{ inputs.base_url }}$UPLOAD_URL" --data-binary @/tmp/package.zip)
+          echo "Upload status: $PUT_CODE"; cat put.json; echo ""
+          [ "$PUT_CODE" = "200" ] || { echo "::error::file upload failed"; kill "$TAIL_PID" 2>/dev/null; cat tail.log; exit 1; }
+
+          STATUS="queued"
+          for i in $(seq 1 15); do
+            sleep 2
+            curl -s -b cookies.txt "${{ inputs.base_url }}/api/jobs/$JOB_ID" -o job.json
+            STATUS=$(jq -r .job.status job.json)
+            echo "Poll $i: job.status=$STATUS"
+            case "$STATUS" in completed|completed_with_errors|failed) break ;; esac
+          done
+
+          kill "$TAIL_PID" 2>/dev/null || true
+          wait "$TAIL_PID" 2>/dev/null || true
+          echo "----- wrangler tail output -----"
+          cat tail.log
+
+          echo "----- final job detail -----"
+          cat job.json; echo ""
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Expected job.status=completed for a valid package, got $STATUS"
+            exit 1
+          fi
+          PACKAGE_STATUS=$(jq -r '.packages[0].status' job.json)
+          if [ "$PACKAGE_STATUS" != "pass" ]; then
+            echo "::error::Expected package status=pass for a clean valid-1.2 package, got $PACKAGE_STATUS"
+            exit 1
+          fi
+          if grep -q "(error)" tail.log; then
+            echo "::error::Worker logged an error while processing the package"
+            exit 1
+          fi
+
+      - name: Download the fixed ZIP
+        run: |
+          HTTP_CODE=$(curl -s -o fixed.zip -w "%{http_code}" -b cookies.txt \
+            "${{ inputs.base_url }}/api/jobs/$JOB_ID/download/$PACKAGE_ID")
+          echo "Download status: $HTTP_CODE"
+          [ "$HTTP_CODE" = "200" ] || { echo "::error::download failed"; exit 1; }
+          SIZE=$(stat -c%s fixed.zip)
+          echo "Downloaded fixed.zip: $SIZE bytes"
+          [ "$SIZE" -gt 0 ] || { echo "::error::downloaded file is empty"; exit 1; }
+          unzip -l fixed.zip
+
+      - name: Clean up test job and user
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "${JOB_ID:-}" ]; then
+            curl -s -b cookies.txt -X DELETE "${{ inputs.base_url }}/api/jobs/$JOB_ID" -o /dev/null || true
+          fi
+          if [ -n "${TEST_EMAIL:-}" ]; then
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM user WHERE email = '$TEST_EMAIL'" || true
+          fi
