@@ -18,11 +18,11 @@ describe("detectFileType", () => {
     expect(detectFileType(fakeMp4()).type).toBe("mp4");
   });
 
-  it("detects a SCORM ZIP (imsmanifest.xml present) and returns the unzipped files", () => {
+  it("detects a SCORM ZIP (imsmanifest.xml present) and returns the entry name list", () => {
     const result = detectFileType(buildFixtureZip("valid-1.2", ["index.html"]));
     expect(result.type).toBe("scorm-zip");
-    expect(result.files).toBeDefined();
-    expect(Object.keys(result.files!)).toContain("imsmanifest.xml");
+    expect(result.names).toBeDefined();
+    expect(result.names).toContain("imsmanifest.xml");
   });
 
   it("detects a PPTX by its OOXML presentation structure", () => {

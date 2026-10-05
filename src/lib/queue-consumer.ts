@@ -72,7 +72,7 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   const inputFormat = INPUT_FORMAT_BY_DETECTED_TYPE[detection.type];
 
   if (detection.type === "scorm-zip") {
-    const result = fixPackage(detection.files!);
+    const result = fixPackage(bytes, detection.names!);
 
     let r2KeyFixed: string | null = null;
     if (result.fixedZip) {

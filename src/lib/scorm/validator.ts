@@ -1,5 +1,4 @@
-import type { Unzipped } from "fflate";
-import { findEntryCaseInsensitive, readEntryText } from "./zip-utils";
+import { decompressSingleEntry, findNameCaseInsensitive, strFromU8 } from "./zip-utils";
 import {
   parseManifest,
   ManifestParseError,
@@ -28,10 +27,13 @@ export function hasErrors(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.severity === "error");
 }
 
-export function validatePackage(files: Unzipped): ValidationResult {
+// originalData is the whole uploaded (still-compressed) ZIP; names is the
+// entry listing from listZipEntries. Only the manifest entry is ever
+// decompressed here -- every other name is just checked for existence.
+export function validatePackage(originalData: Uint8Array, names: string[]): ValidationResult {
   const issues: ValidationIssue[] = [];
 
-  const manifestPath = findEntryCaseInsensitive(files, "imsmanifest.xml");
+  const manifestPath = findNameCaseInsensitive(names, "imsmanifest.xml");
   if (!manifestPath) {
     issues.push({
       severity: "error",
@@ -41,7 +43,8 @@ export function validatePackage(files: Unzipped): ValidationResult {
     return { manifest: null, manifestPath: null, issues, directlyReferencedResourceIds: new Set() };
   }
 
-  const xml = readEntryText(files, manifestPath)!;
+  const manifestBytes = decompressSingleEntry(originalData, manifestPath)!;
+  const xml = strFromU8(manifestBytes);
 
   let manifest: ParsedManifest;
   try {
@@ -130,7 +133,7 @@ export function validatePackage(files: Unzipped): ValidationResult {
 
   for (const res of manifest.resources) {
     if (!res.href) continue;
-    const found = findEntryCaseInsensitive(files, res.href);
+    const found = findNameCaseInsensitive(names, res.href);
     if (!found) {
       issues.push({
         severity: "error",

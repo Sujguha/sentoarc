@@ -29,6 +29,13 @@ max_batch_timeout = 10
 max_retries = 3
 dead_letter_queue = "sentoarc-package-processing-dlq"
 
+[limits]
+# Belt-and-suspenders alongside the streaming rewrite in zip-utils.ts --
+# that rewrite is what actually fixed the CPU/memory failures measured in
+# the perf-test workflow, this just adds margin for the one entry
+# (imsmanifest.xml) that's still genuinely decompressed+recompressed.
+cpu_ms = 30000
+
 [triggers]
 # hourly: retention purge + abandoned-upload-reservation sweep
 crons = ["0 * * * *"]

@@ -1,11 +1,16 @@
 import type { Unzipped } from "fflate";
-import { safeUnzip, strFromU8 } from "./zip-utils";
+import { listZipEntries, safeUnzip, strFromU8 } from "./zip-utils";
 
 export type DetectedFileType = "scorm-zip" | "pptx" | "html-zip" | "pdf" | "mp4" | "html" | "unknown";
 
 export interface DetectionResult {
   type: DetectedFileType;
-  // Populated for zip-based types so callers don't have to unzip again.
+  // scorm-zip: the entry name list (classification + fixing never need
+  // more than that -- see fixer.ts/validator.ts). html-zip: the fully
+  // decompressed map, since wrapAsHtmlZip re-embeds every file's content
+  // (that bundle is small web assets, not multi-MB video, so a full
+  // decompress is cheap).
+  names?: string[];
   files?: Unzipped;
 }
 
@@ -27,16 +32,16 @@ function basename(path: string): string {
   return path.toLowerCase().split("/").pop() ?? "";
 }
 
-function hasImsManifest(files: Unzipped): boolean {
-  return Object.keys(files).some((k) => basename(k) === "imsmanifest.xml");
+function hasImsManifest(names: string[]): boolean {
+  return names.some((k) => basename(k) === "imsmanifest.xml");
 }
 
-function isPptxStructure(files: Unzipped): boolean {
-  return Object.keys(files).some((k) => k.toLowerCase() === "ppt/presentation.xml");
+function isPptxStructure(names: string[]): boolean {
+  return names.some((k) => k.toLowerCase() === "ppt/presentation.xml");
 }
 
-function hasHtmlFile(files: Unzipped): boolean {
-  return Object.keys(files).some((k) => k.toLowerCase().endsWith(".html") || k.toLowerCase().endsWith(".htm"));
+function hasHtmlFile(names: string[]): boolean {
+  return names.some((k) => k.toLowerCase().endsWith(".html") || k.toLowerCase().endsWith(".htm"));
 }
 
 export function detectFileType(bytes: Uint8Array): DetectionResult {
@@ -49,15 +54,20 @@ export function detectFileType(bytes: Uint8Array): DetectionResult {
   }
 
   if (matchesMagic(bytes, ZIP_MAGIC)) {
-    let files: Unzipped;
+    let names: string[];
     try {
-      files = safeUnzip(bytes).files;
+      names = listZipEntries(bytes).entries.map((e) => e.name);
     } catch {
       return { type: "unknown" };
     }
-    if (hasImsManifest(files)) return { type: "scorm-zip", files };
-    if (isPptxStructure(files)) return { type: "pptx", files };
-    if (hasHtmlFile(files)) return { type: "html-zip", files };
+    if (hasImsManifest(names)) return { type: "scorm-zip", names };
+    if (isPptxStructure(names)) return { type: "pptx" };
+    if (hasHtmlFile(names)) {
+      // html-zip bundles are small web assets (html/css/js/images), not
+      // multi-MB video -- a full decompress here is cheap, and
+      // wrapAsHtmlZip needs every file's actual content to re-embed it.
+      return { type: "html-zip", files: safeUnzip(bytes).files };
+    }
     return { type: "unknown" };
   }
 

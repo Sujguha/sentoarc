@@ -1,11 +1,19 @@
-import type { Unzipped } from "fflate";
+import type { Unzipped, Zippable } from "fflate";
 import { strToU8 } from "./zip-utils";
 import { SCORM_API_JS } from "./scormapi-runtime";
 import type { DetectedFileType } from "./detect";
 
 export interface WrapResult {
   title: string;
-  files: Record<string, Uint8Array>;
+  files: Zippable;
+}
+
+// PDF/MP4/PPTX are already-compressed formats -- deflating them again in
+// the output zip burns CPU for ~0% size benefit, and on a near-100MB file
+// that's exactly what pushed a Worker invocation over its CPU budget.
+// Storing them instead is a straight copy (plus a cheap CRC32 pass).
+function stored(bytes: Uint8Array): [Uint8Array, { level: 0 }] {
+  return [bytes, { level: 0 }];
 }
 
 function escapeXml(s: string): string {
@@ -81,7 +89,7 @@ export function wrapAsPdf(title: string, pdfBytes: Uint8Array): WrapResult {
       "imsmanifest.xml": strToU8(buildManifest(title, ["content.pdf"])),
       "launch.html": strToU8(buildLaunchPage(title, body)),
       "scormapi.js": strToU8(SCORM_API_JS),
-      "content.pdf": pdfBytes,
+      "content.pdf": stored(pdfBytes),
     },
   };
 }
@@ -99,7 +107,7 @@ export function wrapAsVideo(title: string, videoBytes: Uint8Array): WrapResult {
       "imsmanifest.xml": strToU8(buildManifest(title, ["content.mp4"])),
       "launch.html": strToU8(buildLaunchPage(title, body)),
       "scormapi.js": strToU8(SCORM_API_JS),
-      "content.mp4": videoBytes,
+      "content.mp4": stored(videoBytes),
     },
   };
 }
@@ -116,7 +124,7 @@ export function wrapAsPptx(title: string, pptxBytes: Uint8Array): WrapResult {
       "imsmanifest.xml": strToU8(buildManifest(title, ["content.pptx"])),
       "launch.html": strToU8(buildLaunchPage(title, body)),
       "scormapi.js": strToU8(SCORM_API_JS),
-      "content.pptx": pptxBytes,
+      "content.pptx": stored(pptxBytes),
     },
   };
 }

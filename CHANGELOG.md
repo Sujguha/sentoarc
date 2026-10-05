@@ -3,6 +3,41 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-10-05
+
+### Fixed
+
+- A performance test (`.github/workflows/perf-test.yml`) against the live
+  deployment found that any package above a few MB never finished
+  processing: the Worker hit Cloudflare's CPU-time limit and/or its
+  128MB-per-invocation memory ceiling, and Queues kept silently retrying
+  the same message forever, leaving the job stuck at "Processing…" with
+  no error ever surfacing. Root cause: `fixPackage` always fully
+  decompressed *and* recompressed every file in the package, even when
+  nothing needed to change (the common "pass" case) — and the only file
+  whose content fixer.ts ever actually rewrites is imsmanifest.xml.
+  - `zip-utils.ts`: added `listZipEntries` (entry names + declared sizes
+    straight from the central directory, no inflation at all) and
+    `decompressSingleEntry` (inflate exactly one named entry), used by
+    `detect.ts`/`validator.ts` instead of fully unzipping just to check
+    names or read the manifest.
+  - `fixPackage`'s "pass" case now returns the original uploaded bytes
+    verbatim — no rebuild. Its "fixed" case uses a new
+    `buildFixedZipStream`: a streaming rebuild (fflate's `Unzip`/`Zip`
+    push APIs) that replaces only the manifest entry and pipes every
+    other entry's already-compressed bytes straight through, chunked to
+    bound memory regardless of package size.
+  - `wrapper.ts`: PDF/MP4/PPTX (already-compressed formats) are now
+    embedded as STORED zip entries instead of being wastefully deflated
+    again — that redundant compression pass was the other half of the
+    measured CPU blowup (hit on the 95MB PDF wrap case specifically).
+  - `wrangler.toml`: explicit `limits.cpu_ms = 30000` as additional
+    margin, now that the hot path is cheap by design rather than by
+    headroom.
+  - Re-running the same perf-test cases against this fix is the next
+    step, to confirm the 30MB/95MB SCORM cases and the 95MB PDF wrap case
+    now complete.
+
 ## [0.3.1] - 2026-10-05
 
 ### Added

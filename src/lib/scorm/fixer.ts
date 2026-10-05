@@ -1,5 +1,4 @@
-import type { Unzipped } from "fflate";
-import { findEntryCaseInsensitive, strToU8, buildZip } from "./zip-utils";
+import { findNameCaseInsensitive, strToU8, buildFixedZipStream } from "./zip-utils";
 import { serializeManifest } from "./manifest-parser";
 import { validatePackage, TITLE_MAX_LENGTH, type ValidationIssue } from "./validator";
 
@@ -14,7 +13,10 @@ export interface FixResult {
   issues: PackageIssue[];
   scormVersionIn: string | null;
   scormVersionOut: string | null;
-  fixedZip: Uint8Array | null;
+  // "pass": the original bytes, unchanged, returned verbatim (no rebuild
+  // at all). "fixed": a stream that replaces just the manifest entry and
+  // pipes every other entry through unchanged -- see buildFixedZipStream.
+  fixedZip: Uint8Array | ReadableStream<Uint8Array> | null;
 }
 
 const SCORM_1_2_NAMESPACES: Record<string, string> = {
@@ -35,8 +37,8 @@ function hasErrorSeverity(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.severity === "error");
 }
 
-export function fixPackage(files: Unzipped): FixResult {
-  const validation = validatePackage(files);
+export function fixPackage(originalData: Uint8Array, names: string[]): FixResult {
+  const validation = validatePackage(originalData, names);
   const { manifest, manifestPath, issues: baseIssues, directlyReferencedResourceIds } = validation;
 
   const packageIsBroken = manifest === null || hasErrorSeverity(baseIssues);
@@ -88,7 +90,7 @@ export function fixPackage(files: Unzipped): FixResult {
         const resourceId = match?.[1];
         const resource = getResourcesArray(raw).find((r: any) => r["@_identifier"] === resourceId);
         if (resource?.["@_href"]) {
-          const corrected = findEntryCaseInsensitive(files, resource["@_href"]);
+          const corrected = findNameCaseInsensitive(names, resource["@_href"]);
           if (corrected) {
             const originalHref = resource["@_href"];
             resource["@_href"] = corrected;
@@ -130,23 +132,20 @@ export function fixPackage(files: Unzipped): FixResult {
       issues: resultIssues,
       scormVersionIn: manifest!.scormVersion,
       scormVersionOut,
-      fixedZip: buildZip(toFileRecord(files)),
+      // Nothing changed -- the uploaded bytes are already a valid
+      // package. Return them verbatim rather than decompressing and
+      // recompressing the whole thing for no reason.
+      fixedZip: originalData,
     };
   }
 
   const newManifestXml = serializeManifest(raw);
-  const outputFiles = toFileRecord(files);
-  outputFiles[manifestPath!] = strToU8(newManifestXml);
 
   return {
     status: "fixed",
     issues: resultIssues,
     scormVersionIn: manifest!.scormVersion,
     scormVersionOut,
-    fixedZip: buildZip(outputFiles),
+    fixedZip: buildFixedZipStream(originalData, { [manifestPath!]: strToU8(newManifestXml) }),
   };
-}
-
-function toFileRecord(files: Unzipped): Record<string, Uint8Array> {
-  return { ...files };
 }
