@@ -4,13 +4,9 @@ export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
-  fromEmail?: string;
-  fromName?: string;
+  fromEmail: string;
+  fromName: string;
 }
-
-// TODO: confirm the verified SendGrid sender identity/domain before launch.
-const DEFAULT_FROM_EMAIL = "noreply@sentoarc.app";
-const DEFAULT_FROM_NAME = "SENtoArc";
 
 export async function sendEmail(apiKey: string, options: SendEmailOptions): Promise<void> {
   const res = await fetch(SENDGRID_ENDPOINT, {
@@ -22,8 +18,8 @@ export async function sendEmail(apiKey: string, options: SendEmailOptions): Prom
     body: JSON.stringify({
       personalizations: [{ to: [{ email: options.to }] }],
       from: {
-        email: options.fromEmail ?? DEFAULT_FROM_EMAIL,
-        name: options.fromName ?? DEFAULT_FROM_NAME,
+        email: options.fromEmail,
+        name: options.fromName,
       },
       subject: options.subject,
       content: [{ type: "text/html", value: options.html }],

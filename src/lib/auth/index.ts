@@ -24,6 +24,8 @@ export function createAuth(env: Env) {
       sendVerificationEmail: async ({ user, url }) => {
         await sendEmail(env.SENDGRID_API_KEY, {
           to: user.email,
+          fromEmail: env.SENDGRID_FROM_EMAIL,
+          fromName: env.SENDGRID_FROM_NAME,
           subject: "Verify your SENtoArc account",
           html: `<p>Confirm your email to finish setting up your SENtoArc account.</p><p><a href="${url}">Verify email</a></p>`,
         });
@@ -43,6 +45,8 @@ export function createAuth(env: Env) {
         sendMagicLink: async ({ email, url }) => {
           await sendEmail(env.SENDGRID_API_KEY, {
             to: email,
+            fromEmail: env.SENDGRID_FROM_EMAIL,
+            fromName: env.SENDGRID_FROM_NAME,
             subject: "Your SENtoArc sign-in link",
             html: `<p>Click to sign in to SENtoArc:</p><p><a href="${url}">Sign in</a></p><p>This link expires shortly and can only be used once.</p>`,
           });

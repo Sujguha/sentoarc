@@ -12,6 +12,8 @@ export interface Env {
 
   BETTER_AUTH_SECRET: string;
   SENDGRID_API_KEY: string;
+  SENDGRID_FROM_EMAIL: string;
+  SENDGRID_FROM_NAME: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
 }
