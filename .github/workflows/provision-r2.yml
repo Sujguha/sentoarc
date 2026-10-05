@@ -1,0 +1,23 @@
+name: Provision R2 bucket (EU jurisdiction)
+
+# One-off, manually-triggered: creates the R2 bucket with a true EU
+# jurisdiction lock (not just a location hint), since this can only be
+# set at creation time via the API/wrangler, not in the dashboard's
+# bucket-creation dialog. Safe to re-run; wrangler no-ops if it exists.
+on:
+  workflow_dispatch:
+
+jobs:
+  create-bucket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx wrangler r2 bucket create sentoarc-packages --jurisdiction=eu
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
