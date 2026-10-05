@@ -5,6 +5,7 @@ export interface Env {
   ASSETS: Fetcher;
 
   FREE_UPLOAD_LIMIT: string;
+  MAX_PACKAGE_SIZE_BYTES: string;
   FREE_RETENTION_HOURS: string;
   PRO_RETENTION_DAYS: string;
   ADMIN_EMAILS: string;

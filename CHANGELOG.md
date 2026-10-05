@@ -3,6 +3,32 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-10-05
+
+### Added
+
+- SCORM package validator and auto-fixer (`src/lib/scorm/`): safe ZIP
+  handling with zip-slip/zip-bomb guards, imsmanifest.xml parsing and
+  rewriting, SCORM version/sequencing detection, scormtype correction,
+  launch-file case correction, title normalization. 30 unit tests against
+  5 fixture manifests plus an inline SCORM-2004-without-sequencing case.
+- Upload pipeline: `POST /api/uploads/init` (server-side size + Free-tier
+  limit enforcement) and `PUT /api/uploads/:packageId/file` (upload routed
+  through the Worker to R2, atomic Free-tier counter increment, enqueues
+  the processing message). Presigned direct-to-R2 upload was in the
+  original design but needs separate R2 API credentials we don't have
+  set up yet — revisit if bulk/larger uploads need it.
+- Queue consumer (`src/lib/queue-consumer.ts`): validates, fixes, uploads
+  the fixed ZIP, records issues, and updates job/package status, with
+  per-message retry on unexpected failures so one bad package doesn't
+  retry the whole batch.
+- Jobs API: `GET /api/jobs`, `GET /api/jobs/:id` (packages + issues, for
+  progress polling), `GET /api/jobs/:id/download/:packageId`,
+  `DELETE /api/jobs/:id`.
+- Real `/app` upload UI: dropzone, live job progress polling, per-package
+  issue list and download, recent-uploads history.
+- `MAX_PACKAGE_SIZE_BYTES` config var (default 50MB).
+
 ## [0.1.0] - 2026-10-05
 
 ### Added
