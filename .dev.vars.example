@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local `wrangler dev` (never commit the real file).
+
+BETTER_AUTH_SECRET=replace-with-a-long-random-string
+SENDGRID_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
