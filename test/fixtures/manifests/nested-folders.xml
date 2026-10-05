@@ -1,0 +1,28 @@
+<?xml version="1.0" standalone="no" ?>
+<manifest identifier="COM.SCORM.NESTED.EXAMPLE"
+          version="1"
+          xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+          xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+  <organizations default="ORG-1">
+    <organization identifier="ORG-1">
+      <title>Nested Course</title>
+      <item identifier="MODULE-1">
+        <title>Module 1</title>
+        <item identifier="ITEM-1" identifierref="RES-1">
+          <title>Lesson 1</title>
+        </item>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="RES-1" type="webcontent" adlcp:scormtype="sco" href="content/lesson1/index.html">
+      <file href="content/lesson1/index.html"/>
+      <file href="content/lesson1/style.css"/>
+      <file href="content/shared/common.js"/>
+    </resource>
+  </resources>
+</manifest>
