@@ -1,0 +1,200 @@
+name: Performance test (file sizes)
+
+# One-off, manually-triggered: uploads progressively larger files against
+# the live deployment and times each stage. Uploads are routed through
+# the Worker and buffered in memory (c.req.arrayBuffer()), not streamed
+# to R2 via a presigned URL -- the main thing this is checking is whether
+# that holds up as files approach MAX_PACKAGE_SIZE_BYTES (currently
+# 100MB), or whether Worker memory limits bite before then.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployed app base URL"
+        required: true
+        default: "https://sentoarc.sujoy-guha2.workers.dev"
+
+jobs:
+  perf-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Sign up and verify a test account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          TEST_EMAIL="sujoy.guha2+perf-$(date +%s)@gmail.com"
+          PASSWORD="Test-$(openssl rand -hex 8)!A1"
+          echo "TEST_EMAIL=$TEST_EMAIL" >> "$GITHUB_ENV"
+
+          curl -s -o /dev/null -w "signup: %{http_code}\n" \
+            -X POST "${{ inputs.base_url }}/api/auth/sign-up/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"Perf Test\",\"email\":\"$TEST_EMAIL\",\"password\":\"$PASSWORD\"}"
+
+          npx wrangler d1 execute sentoarc-db --remote \
+            --command "UPDATE user SET email_verified = 1 WHERE email = '$TEST_EMAIL'"
+
+          # Perf test needs Pro-tier limits (no 5-upload cap) across several
+          # cases in one run -- set the plan tier directly in D1 rather than
+          # going through Stripe (not built yet).
+          npx wrangler d1 execute sentoarc-db --remote \
+            --command "INSERT INTO subscription (id, owner_type, owner_id, tier, status, seats, created_at, updated_at) SELECT lower(hex(randomblob(16))), 'user', id, 'pro', 'active', 1, unixepoch(), unixepoch() FROM user WHERE email = '$TEST_EMAIL'"
+
+          curl -s -o /dev/null -w "signin: %{http_code}\n" -c cookies.txt \
+            -X POST "${{ inputs.base_url }}/api/auth/sign-in/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$PASSWORD\"}"
+
+      - name: Build test files of increasing size
+        run: |
+          mkdir -p /tmp/perf
+
+          build_scorm_zip() {
+            local size_mb=$1 out=$2
+            local dir="/tmp/perf/pkg-$size_mb"
+            mkdir -p "$dir"
+            cat > "$dir/imsmanifest.xml" <<XML
+          <?xml version="1.0" standalone="no" ?>
+          <manifest identifier="PERF-TEST-$size_mb" version="1"
+                    xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+                    xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+            <metadata><schema>ADL SCORM</schema><schemaversion>1.2</schemaversion></metadata>
+            <organizations default="ORG-1">
+              <organization identifier="ORG-1">
+                <title>Perf Test ${size_mb}MB</title>
+                <item identifier="ITEM-1" identifierref="RES-1"><title>Lesson 1</title></item>
+              </organization>
+            </organizations>
+            <resources>
+              <resource identifier="RES-1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+                <file href="index.html"/>
+                <file href="payload.bin"/>
+              </resource>
+            </resources>
+          </manifest>
+          XML
+            echo "<html><body>perf test</body></html>" > "$dir/index.html"
+            # High-entropy payload, like already-compressed video/image
+            # content, so zip compression doesn't make the transfer
+            # unrealistically small relative to what a real course would be.
+            head -c "${size_mb}M" /dev/urandom > "$dir/payload.bin"
+            (cd "$dir" && zip -q -r "$out" .)
+          }
+
+          build_scorm_zip 2 /tmp/perf/scorm-2mb.zip
+          build_scorm_zip 30 /tmp/perf/scorm-30mb.zip
+          build_scorm_zip 95 /tmp/perf/scorm-95mb.zip
+          head -c 95M /dev/urandom > /tmp/perf/raw-95mb.pdf
+          printf '%%PDF-1.4\n' | cat - /tmp/perf/raw-95mb.pdf > /tmp/perf/video-prefix.tmp && mv /tmp/perf/video-prefix.tmp /tmp/perf/pdf-95mb.pdf
+
+          ls -la /tmp/perf/*.zip /tmp/perf/*.pdf
+
+      - name: Run perf cases and time each stage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler tail sentoarc --format pretty > tail.log 2>&1 &
+          TAIL_PID=$!
+          sleep 6
+
+          echo "| Case | Size | Upload (s) | Processing (s) | Total (s) | Result |" > summary.md
+          echo "|---|---|---|---|---|---|" >> summary.md
+
+          run_case() {
+            local label=$1 file=$2 filename=$3
+            local size_bytes
+            size_bytes=$(stat -c%s "$file")
+            local size_mb=$((size_bytes / 1024 / 1024))
+
+            echo "::group::$label ($size_mb MB)"
+
+            local init_json
+            init_json=$(curl -s -b cookies.txt -X POST "${{ inputs.base_url }}/api/uploads/init" \
+              -H "Content-Type: application/json" \
+              -d "{\"filename\":\"$filename\",\"sizeBytes\":$size_bytes}")
+            echo "init: $init_json"
+            local job_id package_id upload_url
+            job_id=$(echo "$init_json" | jq -r .jobId)
+            package_id=$(echo "$init_json" | jq -r .packageId)
+            upload_url=$(echo "$init_json" | jq -r .uploadUrl)
+
+            if [ "$job_id" = "null" ] || [ -z "$job_id" ]; then
+              echo "| $label | ${size_mb}MB | - | - | - | init failed: $init_json |" >> summary.md
+              echo "::endgroup::"
+              return
+            fi
+
+            local t0 t1 t2
+            t0=$(date +%s)
+            local upload_code
+            upload_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+              "${{ inputs.base_url }}$upload_url" --data-binary "@$file")
+            t1=$(date +%s)
+            local upload_s=$((t1 - t0))
+            echo "upload status: $upload_code, took ${upload_s}s"
+
+            if [ "$upload_code" != "200" ]; then
+              echo "| $label | ${size_mb}MB | ${upload_s}s | - | - | upload failed: HTTP $upload_code |" >> summary.md
+              echo "::endgroup::"
+              return
+            fi
+
+            local status="queued"
+            for i in $(seq 1 60); do
+              sleep 3
+              status=$(curl -s -b cookies.txt "${{ inputs.base_url }}/api/jobs/$job_id" | jq -r .job.status)
+              case "$status" in completed|completed_with_errors|failed) break ;; esac
+            done
+            t2=$(date +%s)
+            local processing_s=$((t2 - t1))
+            local total_s=$((t2 - t0))
+            echo "final status: $status, processing took ${processing_s}s"
+
+            echo "| $label | ${size_mb}MB | ${upload_s}s | ${processing_s}s | ${total_s}s | $status |" >> summary.md
+
+            curl -s -b cookies.txt -X DELETE "${{ inputs.base_url }}/api/jobs/$job_id" -o /dev/null || true
+            echo "::endgroup::"
+          }
+
+          run_case "SCORM 2MB"    /tmp/perf/scorm-2mb.zip  "scorm-2mb.zip"
+          run_case "SCORM 30MB"   /tmp/perf/scorm-30mb.zip "scorm-30mb.zip"
+          run_case "SCORM 95MB"   /tmp/perf/scorm-95mb.zip "scorm-95mb.zip"
+          run_case "PDF 95MB"     /tmp/perf/pdf-95mb.pdf   "doc-95mb.pdf"
+
+          kill "$TAIL_PID" 2>/dev/null || true
+          wait "$TAIL_PID" 2>/dev/null || true
+
+          echo "" >> summary.md
+          echo "### Worker errors seen during the run" >> summary.md
+          echo '```' >> summary.md
+          grep -i "error\|exception\|exceeded\|memory" tail.log >> summary.md || echo "(none)" >> summary.md
+          echo '```' >> summary.md
+
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat summary.md
+
+      - name: Clean up test user
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "${TEST_EMAIL:-}" ]; then
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM subscription WHERE owner_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = '$TEST_EMAIL')" || true
+            npx wrangler d1 execute sentoarc-db --remote \
+              --command "DELETE FROM user WHERE email = '$TEST_EMAIL'" || true
+          fi
