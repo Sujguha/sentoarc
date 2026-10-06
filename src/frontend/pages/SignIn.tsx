@@ -3,6 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { authClient } from "../lib/auth-client";
 
+// Only ever used as a same-origin client-side route (react-router
+// navigate / better-auth callbackURL), never as a fetch target or
+// external redirect, so a relative-path check is a sufficient guard
+// against sending someone off-site via a crafted ?next= value.
+const nextParam = new URLSearchParams(window.location.search).get("next");
+const next = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/app";
+
 export default function SignIn() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"password" | "magic-link">("password");
@@ -26,7 +33,7 @@ export default function SignIn() {
       setError(signInError.message ?? "Sign in failed");
       return;
     }
-    navigate("/app");
+    navigate(next);
   }
 
   async function handleMagicLink(e: React.FormEvent<HTMLFormElement>) {
@@ -37,7 +44,7 @@ export default function SignIn() {
 
     const { error: magicLinkError } = await authClient.signIn.magicLink({
       email: String(form.get("email") ?? ""),
-      callbackURL: "/app",
+      callbackURL: next,
     });
 
     setSubmitting(false);

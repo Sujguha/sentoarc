@@ -98,6 +98,10 @@ export const subscription = sqliteTable("subscription", {
   status: text("status").notNull().default("active"),
   currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
   seats: integer("seats").notNull().default(1),
+  // Enterprise is sales-assisted, not self-serve -- set by the founder via
+  // the admin panel, not the org's own admins. Overrides the tier-default
+  // retention window (computeRetentionExpiresAt) when set.
+  retentionDaysOverride: integer("retention_days_override"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

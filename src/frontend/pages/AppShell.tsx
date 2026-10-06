@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+
+interface ActiveWorkspace {
+  id: string;
+  name: string;
+  role: "admin" | "editor" | "viewer";
+}
 
 interface JobSummary {
   id: string;
@@ -103,13 +110,19 @@ export default function AppShell() {
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
   const [tier, setTier] = useState<"free" | "pro" | "enterprise">("free");
+  const [workspace, setWorkspace] = useState<ActiveWorkspace | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProOrEnterprise = tier === "pro" || tier === "enterprise";
+  const isViewer = workspace?.role === "viewer";
 
   useEffect(() => {
     fetch("/api/usage")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setTier((data as { tier: typeof tier }).tier))
+      .catch(() => {});
+    fetch("/api/organizations/active")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setWorkspace((data as { active: ActiveWorkspace | null } | null)?.active ?? null))
       .catch(() => {});
   }, []);
 
@@ -239,28 +252,52 @@ export default function AppShell() {
           Learning Arc.
         </p>
 
-        <div className="mt-6 rounded-lg border-2 border-dashed border-slate-300 p-8 text-center">
-          <input
-            id="file-input"
-            type="file"
-            accept={ALLOWED_EXTENSIONS.join(",")}
-            multiple={isProOrEnterprise}
-            className="hidden"
-            onChange={handleFileChange}
-            disabled={uploading}
-          />
-          <label
-            htmlFor="file-input"
-            className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
-          >
-            {uploading ? "Uploading…" : isProOrEnterprise ? "Choose file(s)" : "Choose a file"}
-          </label>
-          <p className="mt-2 text-xs text-slate-400">
-            SCORM ZIP, PDF, MP4, PPTX, or HTML
-            {isProOrEnterprise
-              ? " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch."
-              : ". Upgrade to Pro to upload multiple packages at once."}
+        {workspace && (
+          <p className="mt-3 text-sm text-slate-500">
+            Uploading as <strong className="text-slate-700">{workspace.name}</strong> ({workspace.role}) — shared
+            with your team.{" "}
+            <Link to="/organization" className="text-indigo-700 underline">
+              Switch workspace
+            </Link>
           </p>
+        )}
+
+        <div className="mt-6 rounded-lg border-2 border-dashed border-slate-300 p-8 text-center">
+          {isViewer ? (
+            <p className="text-sm text-slate-500">
+              Viewers can see this team's uploads but can't add new ones.{" "}
+              <Link to="/organization" className="text-indigo-700 underline">
+                Switch to your personal workspace
+              </Link>{" "}
+              to upload your own packages.
+            </p>
+          ) : (
+            <>
+              <input
+                id="file-input"
+                type="file"
+                accept={ALLOWED_EXTENSIONS.join(",")}
+                multiple={isProOrEnterprise}
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              <label
+                htmlFor="file-input"
+                className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
+              >
+                {uploading ? "Uploading…" : isProOrEnterprise ? "Choose file(s)" : "Choose a file"}
+              </label>
+            </>
+          )}
+          {!isViewer && (
+            <p className="mt-2 text-xs text-slate-400">
+              SCORM ZIP, PDF, MP4, PPTX, or HTML
+              {isProOrEnterprise
+                ? " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch."
+                : ". Upgrade to Pro to upload multiple packages at once."}
+            </p>
+          )}
           {selectedFile && !uploadError && (
             <p className="mt-3 text-sm text-slate-500">
               {selectedFileCount > 1 ? `${selectedFileCount} files selected` : selectedFile.name}

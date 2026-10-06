@@ -1,10 +1,7 @@
 import { createMiddleware } from "hono/factory";
-import { eq, and } from "drizzle-orm";
 import { createDb } from "../lib/db/client";
-import { member } from "../lib/db/schema";
-import type { AppBindings } from "../types/hono";
-
-type OrgRole = "admin" | "editor" | "viewer";
+import { getMemberRole } from "../lib/org-membership";
+import type { AppBindings, OrgRole } from "../types/hono";
 
 // Expects the organization id as the `:orgId` route param. Must run after
 // requireAuth. Re-derives role from D1 on every request.
@@ -17,16 +14,13 @@ export function requireOrgRole(allowed: OrgRole[]) {
     }
 
     const db = createDb(c.env.DB);
-    const [row] = await db
-      .select({ role: member.role })
-      .from(member)
-      .where(and(eq(member.organizationId, orgId), eq(member.userId, user.id)))
-      .limit(1);
+    const role = await getMemberRole(db, orgId, user.id);
 
-    if (!row || !allowed.includes(row.role as OrgRole)) {
+    if (!role || !allowed.includes(role)) {
       return c.json({ error: "forbidden" }, 403);
     }
 
+    c.set("orgRole", role);
     await next();
   });
 }

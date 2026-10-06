@@ -5,6 +5,8 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import AppShell from "./pages/AppShell";
 import Account from "./pages/Account";
+import Organization from "./pages/Organization";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Admin from "./pages/Admin";
 import Impressum from "./pages/legal/Impressum";
 import Datenschutz from "./pages/legal/Datenschutz";
@@ -34,6 +36,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/organization"
+        element={
+          <ProtectedRoute>
+            <Organization />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
       <Route
         path="/admin"
         element={

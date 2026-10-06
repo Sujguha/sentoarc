@@ -15,6 +15,7 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
     email: session.user.email,
     name: session.user.name,
   });
+  c.set("activeOrganizationId", session.session.activeOrganizationId ?? null);
 
   await next();
 });

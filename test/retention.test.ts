@@ -93,10 +93,22 @@ describe("computeRetentionExpiresAt", () => {
     expect(expiresAt.getTime()).toBe(expectedMs);
   });
 
-  it("enterprise tier: same window as pro (no separate enterprise retention var)", () => {
+  it("enterprise tier with no override: same window as pro (no separate enterprise retention var)", () => {
     const proExpiry = computeRetentionExpiresAt("pro", env, now);
     const entExpiry = computeRetentionExpiresAt("enterprise", env, now);
     expect(entExpiry.getTime()).toBe(proExpiry.getTime());
+  });
+
+  it("a retention override takes priority over the tier default", () => {
+    const expiresAt = computeRetentionExpiresAt("enterprise", env, now, 90);
+    expect(expiresAt.getTime()).toBe(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  });
+
+  it("an override of 0 days is honored, not treated as 'no override'", () => {
+    // 0 is falsy but a legitimate (if aggressive) configured value --
+    // must be distinguished from null, not coerced to the tier default.
+    const expiresAt = computeRetentionExpiresAt("enterprise", env, now, 0);
+    expect(expiresAt.getTime()).toBe(now.getTime());
   });
 });
 

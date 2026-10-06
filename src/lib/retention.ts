@@ -11,9 +11,21 @@ import type { HonoVariables } from "../types/hono";
 // period for an upload the user simply never finished is enough.
 const ABANDONED_UPLOAD_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-// Tier is already resolved by resolvePlanTier in the upload routes at
-// the point a job is created -- no need to re-resolve it from D1 here.
-export function computeRetentionExpiresAt(tier: HonoVariables["planTier"], env: Env, now: Date): Date {
+// Tier (and any founder-set retentionDaysOverride) is already resolved
+// by resolvePlanTier in the upload routes at the point a job is created
+// -- no need to re-resolve it from D1 here. The override exists for
+// Enterprise, which is sales-assisted rather than self-serve, so it's
+// set by the founder (see the admin retention route), not configurable
+// by the org itself.
+export function computeRetentionExpiresAt(
+  tier: HonoVariables["planTier"],
+  env: Env,
+  now: Date,
+  retentionDaysOverride: number | null = null
+): Date {
+  if (retentionDaysOverride !== null) {
+    return new Date(now.getTime() + retentionDaysOverride * 24 * 60 * 60 * 1000);
+  }
   const ms =
     tier === "free"
       ? Number(env.FREE_RETENTION_HOURS) * 60 * 60 * 1000

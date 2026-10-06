@@ -208,7 +208,8 @@ async function resolveOwnerTier(db: Db, jobId: string): Promise<"free" | "pro" |
     .from(job)
     .where(eq(job.id, jobId))
     .limit(1);
-  return jobRow ? await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId) : "free";
+  if (!jobRow) return "free";
+  return (await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId)).tier;
 }
 
 // A "bulk" upload: the container itself isn't a package, its entries are.

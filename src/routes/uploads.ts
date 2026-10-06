@@ -5,6 +5,7 @@ import { job, pkg, usageCounter } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
 import { computeRetentionExpiresAt } from "../lib/retention";
+import { logAudit } from "../lib/audit";
 import type { AppBindings } from "../types/hono";
 import type { ProcessingQueueMessage } from "../types/env";
 
@@ -34,6 +35,16 @@ function extensionOf(filename: string): string | null {
 uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   const user = c.get("user");
   const tier = c.get("planTier");
+  const ownerType = c.get("ownerType");
+  const ownerId = c.get("ownerId");
+  const orgRole = c.get("orgRole");
+
+  // Uploading to a shared org project requires editor/admin — a viewer
+  // can see the team's jobs but not add to them.
+  if (ownerType === "org" && orgRole === "viewer") {
+    return c.json({ error: "forbidden", message: "Viewers cannot upload to this organization." }, 403);
+  }
+
   const body = await c.req.json<{ filename?: string; sizeBytes?: number }>().catch(() => null);
   if (!body?.filename) {
     return c.json({ error: "unsupported_file_type", allowed: ALLOWED_EXTENSIONS }, 400);
@@ -61,8 +72,8 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
       .from(usageCounter)
       .where(
         and(
-          eq(usageCounter.ownerType, "user"),
-          eq(usageCounter.ownerId, user.id),
+          eq(usageCounter.ownerType, ownerType),
+          eq(usageCounter.ownerId, ownerId),
           eq(usageCounter.metric, "free_uploads_used")
         )
       )
@@ -75,22 +86,32 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   const now = new Date();
   const jobId = crypto.randomUUID();
   const packageId = crypto.randomUUID();
-  const r2KeyUpload = `uploads/user/${user.id}/${jobId}/${packageId}/original${extension}`;
+  const r2KeyUpload = `uploads/${ownerType}/${ownerId}/${jobId}/${packageId}/original${extension}`;
 
   await db.insert(job).values({
     id: jobId,
-    ownerType: "user",
-    ownerId: user.id,
+    ownerType,
+    ownerId,
     createdByUserId: user.id,
     status: "queued",
     sourceType: "single",
     totalPackages: 1,
     completedPackages: 0,
     failedPackages: 0,
-    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now),
+    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now, c.get("retentionDaysOverride")),
     createdAt: now,
     updatedAt: now,
   });
+  if (ownerType === "org") {
+    await logAudit(db, {
+      organizationId: ownerId,
+      actorUserId: user.id,
+      action: "job.created",
+      targetType: "job",
+      targetId: jobId,
+      metadata: { filename: body.filename, sourceType: "single" },
+    });
+  }
   await db.insert(pkg).values({
     id: packageId,
     jobId,
@@ -113,6 +134,14 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
 uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise"]), async (c) => {
   const user = c.get("user");
   const tier = c.get("planTier");
+  const ownerType = c.get("ownerType");
+  const ownerId = c.get("ownerId");
+  const orgRole = c.get("orgRole");
+
+  if (ownerType === "org" && orgRole === "viewer") {
+    return c.json({ error: "forbidden", message: "Viewers cannot upload to this organization." }, 403);
+  }
+
   const body = await c.req.json<{ files?: { filename?: string; sizeBytes?: number }[] }>().catch(() => null);
 
   if (!body?.files || !Array.isArray(body.files) || body.files.length === 0) {
@@ -148,23 +177,33 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
 
   await db.insert(job).values({
     id: jobId,
-    ownerType: "user",
-    ownerId: user.id,
+    ownerType,
+    ownerId,
     createdByUserId: user.id,
     status: "queued",
     sourceType: "bulk_multi",
     totalPackages: prepared.length,
     completedPackages: 0,
     failedPackages: 0,
-    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now),
+    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now, c.get("retentionDaysOverride")),
     createdAt: now,
     updatedAt: now,
   });
+  if (ownerType === "org") {
+    await logAudit(db, {
+      organizationId: ownerId,
+      actorUserId: user.id,
+      action: "job.created",
+      targetType: "job",
+      targetId: jobId,
+      metadata: { fileCount: prepared.length, sourceType: "bulk_multi" },
+    });
+  }
 
   const packages = [];
   for (const file of prepared) {
     const packageId = crypto.randomUUID();
-    const r2KeyUpload = `uploads/user/${user.id}/${jobId}/${packageId}/original${file.extension}`;
+    const r2KeyUpload = `uploads/${ownerType}/${ownerId}/${jobId}/${packageId}/original${file.extension}`;
     await db.insert(pkg).values({
       id: packageId,
       jobId,
@@ -182,8 +221,10 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
 });
 
 uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => {
-  const user = c.get("user");
   const tier = c.get("planTier");
+  const ownerType = c.get("ownerType");
+  const ownerId = c.get("ownerId");
+  const orgRole = c.get("orgRole");
   const packageId = c.req.param("packageId");
   const db = createDb(c.env.DB);
 
@@ -192,6 +233,7 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
       jobId: pkg.jobId,
       status: pkg.status,
       r2KeyUpload: pkg.r2KeyUpload,
+      ownerType: job.ownerType,
       ownerId: job.ownerId,
     })
     .from(pkg)
@@ -199,8 +241,15 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
     .where(eq(pkg.id, packageId))
     .limit(1);
 
-  if (!row || row.ownerId !== user.id) {
+  // Must be acting as the same owner (personal, or the same org) this
+  // reservation was created under -- any editor/admin in that org can
+  // complete a teammate's reservation (shared projects), but someone
+  // outside the org, or a viewer within it, cannot.
+  if (!row || row.ownerType !== ownerType || row.ownerId !== ownerId) {
     return c.json({ error: "not_found" }, 404);
+  }
+  if (ownerType === "org" && orgRole === "viewer") {
+    return c.json({ error: "forbidden", message: "Viewers cannot upload to this organization." }, 403);
   }
   if (row.status !== "pending") {
     return c.json({ error: "already_uploaded" }, 409);
@@ -219,7 +268,7 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
     const freeLimit = Number(c.env.FREE_UPLOAD_LIMIT);
     await db
       .insert(usageCounter)
-      .values({ ownerType: "user", ownerId: user.id, metric: "free_uploads_used", value: 0, updatedAt: new Date() })
+      .values({ ownerType, ownerId, metric: "free_uploads_used", value: 0, updatedAt: new Date() })
       .onConflictDoNothing();
 
     const updated = await db
@@ -227,8 +276,8 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
       .set({ value: sql`${usageCounter.value} + 1`, updatedAt: new Date() })
       .where(
         and(
-          eq(usageCounter.ownerType, "user"),
-          eq(usageCounter.ownerId, user.id),
+          eq(usageCounter.ownerType, ownerType),
+          eq(usageCounter.ownerId, ownerId),
           eq(usageCounter.metric, "free_uploads_used"),
           sql`${usageCounter.value} < ${freeLimit}`
         )

@@ -1,13 +1,31 @@
 import { Hono } from "hono";
 import { eq, and, desc, inArray } from "drizzle-orm";
-import { createDb } from "../lib/db/client";
+import { createDb, type Db } from "../lib/db/client";
 import { job, pkg, packageIssue } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
-import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
+import { resolvePlanTier, resolvePlanTierFor } from "../middleware/require-plan";
 import { deleteJobAndArtifacts } from "../lib/retention";
-import type { AppBindings } from "../types/hono";
+import { getMemberRole } from "../lib/org-membership";
+import { logAudit } from "../lib/audit";
+import type { AppBindings, AuthedUser, OrgRole } from "../types/hono";
 
 export const jobsRoute = new Hono<AppBindings>();
+
+// A personal job is only visible to its owner (full control, modeled as
+// "admin"). An org job is visible to any current member, at their org
+// role -- this is what makes a job a "shared project": any teammate who
+// was in the org when it ran can see it, not just whoever created it.
+// Re-checked against D1 on every request, not cached on the job row.
+export async function getJobAccessRole(
+  db: Db,
+  user: AuthedUser,
+  jobRow: { ownerType: "user" | "org"; ownerId: string }
+): Promise<OrgRole | null> {
+  if (jobRow.ownerType === "user") {
+    return jobRow.ownerId === user.id ? "admin" : null;
+  }
+  return getMemberRole(db, jobRow.ownerId, user.id);
+}
 
 // Wraps a field in double quotes (escaping embedded quotes) whenever it
 // contains a comma, quote, or newline -- the minimal correct CSV
@@ -25,15 +43,19 @@ export function csvRow(fields: (string | number | null | undefined)[]): string {
   return fields.map(csvField).join(",") + "\r\n";
 }
 
-jobsRoute.get("/", requireAuth, async (c) => {
-  const user = c.get("user");
+// Scoped to the caller's current workspace (active org, or personal if
+// none) -- switching active org switches which team's jobs you see here,
+// the same mental model as a Slack/Notion workspace switcher.
+jobsRoute.get("/", requireAuth, resolvePlanTier, async (c) => {
+  const ownerType = c.get("ownerType");
+  const ownerId = c.get("ownerId");
   const db = createDb(c.env.DB);
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
 
   const rows = await db
     .select()
     .from(job)
-    .where(and(eq(job.ownerType, "user"), eq(job.ownerId, user.id)))
+    .where(and(eq(job.ownerType, ownerType), eq(job.ownerId, ownerId)))
     .orderBy(desc(job.createdAt))
     .limit(limit);
 
@@ -61,7 +83,7 @@ jobsRoute.get("/:id", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
 
   const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
-  if (!jobRow || jobRow.ownerId !== user.id) {
+  if (!jobRow || !(await getJobAccessRole(db, user, jobRow))) {
     return c.json({ error: "not_found" }, 404);
   }
 
@@ -83,15 +105,23 @@ jobsRoute.get("/:id", requireAuth, async (c) => {
 });
 
 // CSV export of a job's report -- Pro/Enterprise only (Free gets the
-// on-screen report only, per the pricing page).
-jobsRoute.get("/:id/export.csv", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise"]), async (c) => {
+// on-screen report only, per the pricing page). Gated on the job's own
+// owner's tier, not the caller's currently-active workspace -- those
+// can differ (e.g. viewing a job in an org you belong to but aren't
+// currently switched into).
+jobsRoute.get("/:id/export.csv", requireAuth, async (c) => {
   const user = c.get("user");
   const jobId = c.req.param("id");
   const db = createDb(c.env.DB);
 
   const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
-  if (!jobRow || jobRow.ownerId !== user.id) {
+  if (!jobRow || !(await getJobAccessRole(db, user, jobRow))) {
     return c.json({ error: "not_found" }, 404);
+  }
+
+  const { tier } = await resolvePlanTierFor(db, jobRow.ownerType, jobRow.ownerId);
+  if (tier !== "pro" && tier !== "enterprise") {
+    return c.json({ error: "plan_upgrade_required", requiredPlans: ["pro", "enterprise"] }, 403);
   }
 
   const packages = await db.select().from(pkg).where(eq(pkg.jobId, jobId));
@@ -149,6 +179,7 @@ jobsRoute.get("/:id/download/:packageId", requireAuth, async (c) => {
 
   const [row] = await db
     .select({
+      ownerType: job.ownerType,
       ownerId: job.ownerId,
       r2KeyFixed: pkg.r2KeyFixed,
       originalFilename: pkg.originalFilename,
@@ -158,7 +189,7 @@ jobsRoute.get("/:id/download/:packageId", requireAuth, async (c) => {
     .where(and(eq(pkg.id, packageId), eq(job.id, jobId)))
     .limit(1);
 
-  if (!row || row.ownerId !== user.id) {
+  if (!row || !(await getJobAccessRole(db, user, row))) {
     return c.json({ error: "not_found" }, 404);
   }
   if (!row.r2KeyFixed) {
@@ -185,8 +216,22 @@ jobsRoute.delete("/:id", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
 
   const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
-  if (!jobRow || jobRow.ownerId !== user.id) {
+  const role = jobRow ? await getJobAccessRole(db, user, jobRow) : null;
+  if (!jobRow || !role) {
     return c.json({ error: "not_found" }, 404);
+  }
+  if (role === "viewer") {
+    return c.json({ error: "forbidden", message: "Viewers cannot delete jobs." }, 403);
+  }
+
+  if (jobRow.ownerType === "org") {
+    await logAudit(db, {
+      organizationId: jobRow.ownerId,
+      actorUserId: user.id,
+      action: "job.deleted",
+      targetType: "job",
+      targetId: jobId,
+    });
   }
 
   await deleteJobAndArtifacts(db, c.env.PACKAGES_BUCKET, jobId);

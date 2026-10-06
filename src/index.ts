@@ -7,6 +7,7 @@ import { adminRoute } from "./routes/admin";
 import { uploadsRoute } from "./routes/uploads";
 import { jobsRoute } from "./routes/jobs";
 import { billingRoute } from "./routes/billing";
+import { organizationsRoute } from "./routes/organizations";
 import { processPackageMessage } from "./lib/queue-consumer";
 import { createDb } from "./lib/db/client";
 import { purgeExpiredJobs, sweepAbandonedUploads } from "./lib/retention";
@@ -27,6 +28,7 @@ app.route("/api/admin", adminRoute);
 app.route("/api/uploads", uploadsRoute);
 app.route("/api/jobs", jobsRoute);
 app.route("/api/billing", billingRoute);
+app.route("/api/organizations", organizationsRoute);
 
 // Everything that isn't /api/* falls through to the static SPA build.
 app.notFound((c) => c.env.ASSETS.fetch(c.req.raw));

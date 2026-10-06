@@ -3,6 +3,61 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-10-06
+
+### Added
+
+- Enterprise tier is now real: an audit (same approach as the earlier
+  Pro-tier one) found it was DB scaffold (`organization`/`member`/
+  `invitation`/`auditLog` tables) plus one correctly-written but
+  never-called middleware (`requireOrgRole`) and otherwise pure
+  marketing copy. Four of the six claimed features are now actually
+  built; the other two (a Learning Arc delivery connector, SSO) are
+  removed from the pricing page rather than left as unbacked claims --
+  the connector is blocked on the same policy question as the WalkMe
+  deep link (no public API, browser automation ruled out); SSO needs a
+  new vendor dependency decision neither of which this pass resolves.
+  - **Roles**: better-auth's `organization` plugin now has custom
+    admin/editor/viewer roles (`src/lib/org-access-control.ts`, shared
+    between the server auth config and the frontend client so both
+    agree) in place of its default owner/admin/member set. Org
+    creation, invites (emailed via SendGrid), member listing, and role
+    changes all go through better-auth's own built-in
+    `/api/auth/organization/*` endpoints -- no SENtoArc code had to
+    reimplement any of that.
+  - **Shared migration projects**: switching your active org (the
+    existing `session.activeOrganizationId` better-auth already
+    tracked) now actually changes who you're uploading/viewing jobs
+    as. `resolvePlanTier` re-verifies membership on every request (never
+    trusts the session field alone) and resolves `ownerType`/`ownerId`
+    accordingly; `uploads.ts`/`jobs.ts` use that instead of always
+    hardcoding the caller's own user id. A job's list view is scoped to
+    the active workspace; a job's detail/download/CSV/delete views are
+    reachable by any current member of the job's owning org, not just
+    whoever created it (`getJobAccessRole`, re-derived from D1 on every
+    request). Viewers can see a team's jobs but can't upload or delete.
+  - **Full audit log**: `logAudit()` (`src/lib/audit.ts`) writes to the
+    existing `audit_log` table from both app code (job created/deleted)
+    and better-auth's `organizationHooks` (org created, member added/
+    removed/role-changed, invitation created) -- nothing writes here
+    besides those. Admin-only `GET /api/organizations/:orgId/audit-log`
+    and a view in the new `/organization` page.
+  - **Configurable data retention**: `subscription.retentionDaysOverride`
+    (migration `0004`), settable only via a founder-only admin route
+    (`PUT /api/admin/subscriptions/:ownerType/:ownerId/retention`) --
+    Enterprise is sales-assisted, not self-serve, so this is something
+    the founder sets after a contract conversation, not something an
+    org configures itself. `computeRetentionExpiresAt` uses it ahead of
+    the tier default when set.
+  - New `/organization` page (create/switch workspace, members, invite,
+    roles, audit log) and `/accept-invitation` page; `/app` shows which
+    workspace you're uploading as and hides the upload control for
+    viewers. `SignIn` now supports a same-origin `?next=` redirect so
+    the invitation-accept flow survives a sign-in detour.
+  - 23 new tests (`test/require-plan.test.ts` active-org-context cases,
+    `test/job-access.test.ts`, `test/audit.test.ts`, `test/retention.test.ts`
+    override cases) against real D1 bindings.
+
 ## [0.7.2] - 2026-10-06
 
 ### Added

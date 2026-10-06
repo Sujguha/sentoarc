@@ -15,6 +15,7 @@ export function Nav() {
           {session ? (
             <>
               <Link to="/app">App</Link>
+              <Link to="/organization">Organization</Link>
               <Link to="/account">Account</Link>
               <button onClick={() => signOut()} className="text-slate-900">
                 Sign out
