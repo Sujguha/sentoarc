@@ -6,6 +6,7 @@ import { contactSalesRoute } from "./routes/contact-sales";
 import { adminRoute } from "./routes/admin";
 import { uploadsRoute } from "./routes/uploads";
 import { jobsRoute } from "./routes/jobs";
+import { billingRoute } from "./routes/billing";
 import { processPackageMessage } from "./lib/queue-consumer";
 import type { AppBindings } from "./types/hono";
 import type { Env, ProcessingQueueMessage } from "./types/env";
@@ -23,6 +24,7 @@ app.route("/api/contact-sales", contactSalesRoute);
 app.route("/api/admin", adminRoute);
 app.route("/api/uploads", uploadsRoute);
 app.route("/api/jobs", jobsRoute);
+app.route("/api/billing", billingRoute);
 
 // Everything that isn't /api/* falls through to the static SPA build.
 app.notFound((c) => c.env.ASSETS.fetch(c.req.raw));

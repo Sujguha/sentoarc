@@ -17,6 +17,8 @@ export interface Env {
   SENDGRID_FROM_NAME: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  STRIPE_PRICE_ID_MONTHLY: string;
+  STRIPE_PRICE_ID_YEARLY: string;
 }
 
 export type ProcessingQueueMessage =
