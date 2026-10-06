@@ -1,13 +1,17 @@
 import { eq, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db/client";
 import { job, pkg, packageIssue } from "./db/schema";
-import { buildZip } from "./scorm/zip-utils";
+import { buildZip, decompressSingleEntry } from "./scorm/zip-utils";
 import { fixPackage, type PackageIssue } from "./scorm/fixer";
 import { detectFileType, type DetectedFileType } from "./scorm/detect";
 import { wrapAsScorm } from "./scorm/wrapper";
+import { resolvePlanTierFor } from "../middleware/require-plan";
 import type { Env, ProcessingQueueMessage } from "../types/env";
 
-const INPUT_FORMAT_BY_DETECTED_TYPE: Record<Exclude<DetectedFileType, "unknown">, "scorm" | "pdf" | "mp4" | "pptx" | "html"> = {
+const INPUT_FORMAT_BY_DETECTED_TYPE: Record<
+  Exclude<DetectedFileType, "unknown" | "zip-of-zips">,
+  "scorm" | "pdf" | "mp4" | "pptx" | "html"
+> = {
   "scorm-zip": "scorm",
   pdf: "pdf",
   mp4: "mp4",
@@ -21,11 +25,6 @@ function deriveFixedKey(uploadKey: string): string {
 }
 
 export async function processPackageMessage(message: ProcessingQueueMessage, env: Env): Promise<void> {
-  if (message.type !== "process") {
-    // "unpack" (ZIP-of-ZIPs expansion) is a Phase 3 bulk-upload feature.
-    return;
-  }
-
   const db = createDb(env.DB);
   const now = () => new Date();
 
@@ -66,6 +65,11 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
       scormVersionOut: null,
       r2KeyFixed: null,
     });
+    return;
+  }
+
+  if (detection.type === "zip-of-zips") {
+    await expandZipOfZips(db, env, message, bytes, detection.names!);
     return;
   }
 
@@ -130,6 +134,98 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
     scormVersionOut: "1.2",
     r2KeyFixed,
   });
+}
+
+// A "bulk" upload: the container itself isn't a package, its entries are.
+// Pro/Enterprise only -- Free stays "single packages only" per the
+// pricing page. Each inner .zip is extracted (not re-compressed; its
+// bytes already are a complete, valid .zip) into its own package row
+// under the same job and re-enqueued through the normal "process" path,
+// then the container row is replaced by however many packages were
+// actually found -- it was never itself a real deliverable.
+async function expandZipOfZips(
+  db: Db,
+  env: Env,
+  message: Extract<ProcessingQueueMessage, { type: "process" }>,
+  bytes: Uint8Array,
+  innerNames: string[]
+): Promise<void> {
+  const [jobRow] = await db
+    .select({ ownerType: job.ownerType, ownerId: job.ownerId })
+    .from(job)
+    .where(eq(job.id, message.jobId))
+    .limit(1);
+
+  const tier = jobRow ? await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId) : "free";
+
+  if (tier === "free") {
+    const msg =
+      "This ZIP contains multiple SCORM packages. Bulk uploads (a ZIP of ZIPs) require a Pro plan — upgrade, or upload each package separately.";
+    await finishPackage(db, message, {
+      status: "failed",
+      errorMessage: msg,
+      issues: [{ severity: "error", code: "BULK_REQUIRES_PRO", message: msg, fixApplied: false }],
+      inputFormat: null,
+      scormVersionIn: null,
+      scormVersionOut: null,
+      r2KeyFixed: null,
+    });
+    return;
+  }
+
+  const now = new Date();
+  const parentDir = message.r2Key.replace(/\/[^/]+\/[^/]+$/, ""); // strip "/<packageId>/original.ext"
+
+  const newPackages: { id: string; r2Key: string }[] = [];
+  for (const name of innerNames) {
+    const innerBytes = decompressSingleEntry(bytes, name);
+    if (!innerBytes || innerBytes.length === 0) continue;
+
+    const newPackageId = crypto.randomUUID();
+    const filename = name.split("/").pop() || name;
+    const r2Key = `${parentDir}/${newPackageId}/original.zip`;
+
+    await env.PACKAGES_BUCKET.put(r2Key, innerBytes);
+    await db.insert(pkg).values({
+      id: newPackageId,
+      jobId: message.jobId,
+      originalFilename: filename,
+      r2KeyUpload: r2Key,
+      status: "queued",
+      sizeBytes: innerBytes.length,
+      createdAt: now,
+      updatedAt: now,
+    });
+    newPackages.push({ id: newPackageId, r2Key });
+  }
+
+  if (newPackages.length === 0) {
+    const msg = "This looked like a bundle of SCORM packages, but none of the inner .zip files could be read.";
+    await finishPackage(db, message, {
+      status: "failed",
+      errorMessage: msg,
+      issues: [{ severity: "error", code: "BULK_EXPAND_FAILED", message: msg, fixApplied: false }],
+      inputFormat: null,
+      scormVersionIn: null,
+      scormVersionOut: null,
+      r2KeyFixed: null,
+    });
+    return;
+  }
+
+  // Replace the container row's slot in totalPackages with however many
+  // real packages it actually contained, then enqueue each one — in that
+  // order, so a fast consumer can never see a stale (too-low) total.
+  await db
+    .update(job)
+    .set({ sourceType: "bulk_zip_of_zips", totalPackages: newPackages.length, updatedAt: now })
+    .where(eq(job.id, message.jobId));
+  await db.delete(pkg).where(eq(pkg.id, message.packageId));
+
+  for (const p of newPackages) {
+    const nextMessage: ProcessingQueueMessage = { type: "process", jobId: message.jobId, packageId: p.id, r2Key: p.r2Key };
+    await env.PACKAGE_QUEUE.send(nextMessage);
+  }
 }
 
 interface FinishArgs {

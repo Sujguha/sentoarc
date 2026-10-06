@@ -169,7 +169,7 @@ export function wrapAsHtmlZip(title: string, zipFiles: Unzipped): WrapResult {
   return { title, files };
 }
 
-export function wrapAsScorm(type: Exclude<DetectedFileType, "scorm-zip" | "unknown">, bytes: Uint8Array, filename: string, zipFiles?: Unzipped): WrapResult {
+export function wrapAsScorm(type: Exclude<DetectedFileType, "scorm-zip" | "unknown" | "zip-of-zips">, bytes: Uint8Array, filename: string, zipFiles?: Unzipped): WrapResult {
   const title = titleFromFilename(filename);
   switch (type) {
     case "pdf":

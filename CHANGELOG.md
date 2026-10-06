@@ -3,6 +3,39 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-10-06
+
+### Added
+
+- Bulk upload is now real (Pro/Enterprise-gated), closing the gap found
+  auditing the pricing page against the actual code: "Bulk upload" and
+  "Single packages only" were marketing copy with no backing logic
+  before this.
+  - `POST /api/uploads/bulk/init`: multiple files selected at once,
+    gated by `requirePlan(["pro","enterprise"])` (previously-dead-code
+    middleware, now actually wired in). Creates one job with N package
+    rows; each file is PUT through the existing per-package upload
+    endpoint.
+  - ZIP-of-ZIPs: uploading a single ZIP whose own entries are
+    themselves whole `.zip` files (two or more, at the top level) is
+    now auto-detected (`detect.ts`'s new `zip-of-zips` type) and
+    expanded by the queue consumer into one package per inner ZIP,
+    each processed through the normal validate/fix pipeline. Free-tier
+    uploads of this shape fail cleanly with an upgrade prompt rather
+    than being silently mishandled; the gate is enforced in the queue
+    consumer itself (tier is resolved from D1 via a new
+    `resolvePlanTierFor`, shared with the request-time middleware)
+    since the container/bundle shape is only knowable after inspecting
+    the uploaded bytes, not at upload time.
+  - `/app` upload UI: multi-file selection is offered only to
+    Pro/Enterprise accounts (native file input's `multiple` attribute);
+    Free accounts keep the existing single-file picker, consistent with
+    "single packages only".
+  - New tests: `test/require-plan.test.ts` (tier resolution +
+    `requirePlan` gating — previously untested entirely) and
+    `test/queue-consumer.test.ts` (ZIP-of-ZIPs expansion, both the
+    free-tier rejection and the pro-tier expand-then-process path).
+
 ## [0.4.1] - 2026-10-06
 
 ### Changed

@@ -1,7 +1,7 @@
 import type { Unzipped } from "fflate";
 import { listZipEntries, safeUnzip, strFromU8 } from "./zip-utils";
 
-export type DetectedFileType = "scorm-zip" | "pptx" | "html-zip" | "pdf" | "mp4" | "html" | "unknown";
+export type DetectedFileType = "scorm-zip" | "zip-of-zips" | "pptx" | "html-zip" | "pdf" | "mp4" | "html" | "unknown";
 
 export interface DetectionResult {
   type: DetectedFileType;
@@ -9,7 +9,8 @@ export interface DetectionResult {
   // more than that -- see fixer.ts/validator.ts). html-zip: the fully
   // decompressed map, since wrapAsHtmlZip re-embeds every file's content
   // (that bundle is small web assets, not multi-MB video, so a full
-  // decompress is cheap).
+  // decompress is cheap). zip-of-zips: the inner .zip entry names, to be
+  // extracted (not decompressed) one at a time by the caller.
   names?: string[];
   files?: Unzipped;
 }
@@ -44,6 +45,16 @@ function hasHtmlFile(names: string[]): boolean {
   return names.some((k) => k.toLowerCase().endsWith(".html") || k.toLowerCase().endsWith(".htm"));
 }
 
+// A "bulk" upload: a container ZIP whose own entries are themselves whole
+// .zip files (each expected to be its own SCORM package), rather than a
+// SCORM package itself. Only counts entries directly inside the
+// container (no nested folders) -- an arbitrarily deep search isn't
+// needed for how these get produced (an export tool or a user zipping up
+// a folder of packages) and keeps expansion a flat, bounded operation.
+function innerZipEntries(names: string[]): string[] {
+  return names.filter((n) => n.toLowerCase().endsWith(".zip") && !n.includes("/"));
+}
+
 export function detectFileType(bytes: Uint8Array): DetectionResult {
   if (matchesMagic(bytes, PDF_MAGIC)) {
     return { type: "pdf" };
@@ -62,6 +73,10 @@ export function detectFileType(bytes: Uint8Array): DetectionResult {
     }
     if (hasImsManifest(names)) return { type: "scorm-zip", names };
     if (isPptxStructure(names)) return { type: "pptx" };
+
+    const innerZips = innerZipEntries(names);
+    if (innerZips.length >= 2) return { type: "zip-of-zips", names: innerZips };
+
     if (hasHtmlFile(names)) {
       // html-zip bundles are small web assets (html/css/js/images), not
       // multi-MB video -- a full decompress here is cheap, and

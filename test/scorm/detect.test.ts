@@ -56,4 +56,38 @@ describe("detectFileType", () => {
   it("returns unknown for an empty ZIP", () => {
     expect(detectFileType(buildZip({})).type).toBe("unknown");
   });
+
+  it("detects a container of multiple inner .zip packages as zip-of-zips", () => {
+    const inner1 = buildFixtureZip("valid-1.2", ["index.html"]);
+    const inner2 = buildFixtureZip("scorm-2004", ["index.html"]);
+    const container = buildZip({
+      "course-a.zip": [inner1, { level: 0 }],
+      "course-b.zip": [inner2, { level: 0 }],
+    });
+    const result = detectFileType(container);
+    expect(result.type).toBe("zip-of-zips");
+    expect(result.names).toEqual(expect.arrayContaining(["course-a.zip", "course-b.zip"]));
+  });
+
+  it("does not classify a ZIP with a single nested .zip as zip-of-zips", () => {
+    const inner = buildFixtureZip("valid-1.2", ["index.html"]);
+    // Only one inner .zip, alongside an unrelated file -- a single
+    // incidental .zip entry shouldn't trigger bulk expansion.
+    const container = buildZip({
+      "course-a.zip": [inner, { level: 0 }],
+      "readme.txt": strToU8("just one package here"),
+    });
+    expect(detectFileType(container).type).toBe("unknown");
+  });
+
+  it("ignores nested .zip entries inside subfolders when counting for zip-of-zips", () => {
+    const inner = buildFixtureZip("valid-1.2", ["index.html"]);
+    const container = buildZip({
+      "folder/course-a.zip": [inner, { level: 0 }],
+      "folder/course-b.zip": [inner, { level: 0 }],
+    });
+    // Both inner zips are nested one level deep -- not top-level entries,
+    // so this isn't classified as a flat zip-of-zips bundle.
+    expect(detectFileType(container).type).toBe("unknown");
+  });
 });

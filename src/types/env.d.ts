@@ -21,6 +21,4 @@ export interface Env {
   STRIPE_PRICE_ID_YEARLY: string;
 }
 
-export type ProcessingQueueMessage =
-  | { type: "process"; jobId: string; packageId: string; r2Key: string }
-  | { type: "unpack"; jobId: string; packageId: string; r2Key: string };
+export type ProcessingQueueMessage = { type: "process"; jobId: string; packageId: string; r2Key: string };

@@ -3,9 +3,13 @@ import { eq, and, sql } from "drizzle-orm";
 import { createDb } from "../lib/db/client";
 import { job, pkg, usageCounter } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
-import { resolvePlanTier } from "../middleware/require-plan";
+import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
 import type { AppBindings } from "../types/hono";
 import type { ProcessingQueueMessage } from "../types/env";
+
+// Bulk upload (multiple files in one job) is a Pro/Enterprise feature —
+// Free stays "single packages only" per the pricing page.
+const MAX_BULK_FILES = 50;
 
 export const uploadsRoute = new Hono<AppBindings>();
 
@@ -97,6 +101,80 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   });
 
   return c.json({ jobId, packageId, uploadUrl: `/api/uploads/${packageId}/file` });
+});
+
+// Bulk upload: one job containing multiple packages, uploaded as
+// separate files (as opposed to bulk_zip_of_zips, where one ZIP's
+// entries are themselves ZIPs — that's auto-detected and expanded by the
+// queue consumer instead). Each returned uploadUrl is the same
+// PUT /:packageId/file endpoint used by a single upload.
+uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise"]), async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{ files?: { filename?: string; sizeBytes?: number }[] }>().catch(() => null);
+
+  if (!body?.files || !Array.isArray(body.files) || body.files.length === 0) {
+    return c.json({ error: "files_required" }, 400);
+  }
+  if (body.files.length > MAX_BULK_FILES) {
+    return c.json({ error: "too_many_files", maxFiles: MAX_BULK_FILES }, 400);
+  }
+
+  const maxBytes = Number(c.env.MAX_PACKAGE_SIZE_BYTES);
+  const prepared: { filename: string; sizeBytes: number; extension: string }[] = [];
+  for (const file of body.files) {
+    if (!file?.filename) {
+      return c.json({ error: "unsupported_file_type", allowed: ALLOWED_EXTENSIONS }, 400);
+    }
+    const extension = extensionOf(file.filename);
+    if (!extension) {
+      return c.json({ error: "unsupported_file_type", allowed: ALLOWED_EXTENSIONS }, 400);
+    }
+    const sizeBytes = Number(file.sizeBytes);
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      return c.json({ error: "size_bytes_required" }, 400);
+    }
+    if (sizeBytes > maxBytes) {
+      return c.json({ error: "package_too_large", maxBytes, filename: file.filename }, 413);
+    }
+    prepared.push({ filename: file.filename, sizeBytes, extension });
+  }
+
+  const db = createDb(c.env.DB);
+  const now = new Date();
+  const jobId = crypto.randomUUID();
+
+  await db.insert(job).values({
+    id: jobId,
+    ownerType: "user",
+    ownerId: user.id,
+    createdByUserId: user.id,
+    status: "queued",
+    sourceType: "bulk_multi",
+    totalPackages: prepared.length,
+    completedPackages: 0,
+    failedPackages: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const packages = [];
+  for (const file of prepared) {
+    const packageId = crypto.randomUUID();
+    const r2KeyUpload = `uploads/user/${user.id}/${jobId}/${packageId}/original${file.extension}`;
+    await db.insert(pkg).values({
+      id: packageId,
+      jobId,
+      originalFilename: file.filename,
+      r2KeyUpload,
+      status: "pending",
+      sizeBytes: file.sizeBytes,
+      createdAt: now,
+      updatedAt: now,
+    });
+    packages.push({ packageId, filename: file.filename, uploadUrl: `/api/uploads/${packageId}/file` });
+  }
+
+  return c.json({ jobId, packages });
 });
 
 uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => {

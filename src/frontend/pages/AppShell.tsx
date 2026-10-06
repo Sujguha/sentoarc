@@ -44,6 +44,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   size_bytes_required: "Couldn't read the file size — please try again.",
   already_uploaded: "This upload has already been submitted.",
   empty_upload: "The file appears to be empty.",
+  files_required: "Please choose at least one file.",
+  too_many_files: "Too many files in one bulk upload — please split into smaller batches.",
+  plan_upgrade_required: "Bulk upload (multiple files at once) requires a Pro plan.",
 };
 
 // We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
@@ -83,12 +86,22 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AppShell() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileCount, setSelectedFileCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
+  const [tier, setTier] = useState<"free" | "pro" | "enterprise">("free");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const canBulkUpload = tier === "pro" || tier === "enterprise";
+
+  useEffect(() => {
+    fetch("/api/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setTier((data as { tier: typeof tier }).tier))
+      .catch(() => {});
+  }, []);
 
   function loadRecentJobs() {
     fetch("/api/jobs")
@@ -123,44 +136,82 @@ export default function AppShell() {
     };
   }, [activeJobId]);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file name after an error
-    if (!file) return;
-
-    const lower = file.name.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-      setUploadError(ERROR_MESSAGES.unsupported_file_type!);
+  async function uploadSingle(file: File) {
+    const initRes = await fetch("/api/uploads/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, sizeBytes: file.size }),
+    });
+    const initBody = (await initRes.json()) as { error?: string; jobId?: string; uploadUrl?: string };
+    if (!initRes.ok || !initBody.uploadUrl || !initBody.jobId) {
+      setUploadError(friendlyError(initBody.error));
       return;
     }
 
-    setSelectedFile(file);
+    const uploadRes = await fetch(initBody.uploadUrl, { method: "PUT", body: file });
+    const uploadBody = (await uploadRes.json()) as { error?: string };
+    if (!uploadRes.ok) {
+      setUploadError(friendlyError(uploadBody.error));
+      return;
+    }
+
+    setActiveJobId(initBody.jobId);
+  }
+
+  async function uploadBulk(files: File[]) {
+    const initRes = await fetch("/api/uploads/bulk/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: files.map((f) => ({ filename: f.name, sizeBytes: f.size })) }),
+    });
+    const initBody = (await initRes.json()) as {
+      error?: string;
+      jobId?: string;
+      packages?: { packageId: string; filename: string; uploadUrl: string }[];
+    };
+    if (!initRes.ok || !initBody.jobId || !initBody.packages) {
+      setUploadError(friendlyError(initBody.error));
+      return;
+    }
+
+    setActiveJobId(initBody.jobId);
+
+    await Promise.all(
+      initBody.packages.map(async (p, i) => {
+        const res = await fetch(p.uploadUrl, { method: "PUT", body: files[i] });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setUploadError(friendlyError(body.error));
+        }
+      })
+    );
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-selecting the same file name after an error
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const lower = file.name.toLowerCase();
+      if (!ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        setUploadError(ERROR_MESSAGES.unsupported_file_type!);
+        return;
+      }
+    }
+
+    setSelectedFile(files[0] ?? null);
+    setSelectedFileCount(files.length);
     setUploadError(null);
     setUploading(true);
     setJobDetail(null);
 
     try {
-      const initRes = await fetch("/api/uploads/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, sizeBytes: file.size }),
-      });
-      const initBody = (await initRes.json()) as { error?: string; jobId?: string; uploadUrl?: string };
-      if (!initRes.ok || !initBody.uploadUrl || !initBody.jobId) {
-        setUploadError(friendlyError(initBody.error));
-        setUploading(false);
-        return;
+      if (files.length === 1) {
+        await uploadSingle(files[0]!);
+      } else {
+        await uploadBulk(files);
       }
-
-      const uploadRes = await fetch(initBody.uploadUrl, { method: "PUT", body: file });
-      const uploadBody = (await uploadRes.json()) as { error?: string };
-      if (!uploadRes.ok) {
-        setUploadError(friendlyError(uploadBody.error));
-        setUploading(false);
-        return;
-      }
-
-      setActiveJobId(initBody.jobId);
     } catch {
       setUploadError("Upload failed — please check your connection and try again.");
     } finally {
@@ -183,6 +234,7 @@ export default function AppShell() {
             id="file-input"
             type="file"
             accept={ALLOWED_EXTENSIONS.join(",")}
+            multiple={canBulkUpload}
             className="hidden"
             onChange={handleFileChange}
             disabled={uploading}
@@ -191,11 +243,18 @@ export default function AppShell() {
             htmlFor="file-input"
             className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
           >
-            {uploading ? "Uploading…" : "Choose a file"}
+            {uploading ? "Uploading…" : canBulkUpload ? "Choose file(s)" : "Choose a file"}
           </label>
-          <p className="mt-2 text-xs text-slate-400">SCORM ZIP, PDF, MP4, PPTX, or HTML</p>
+          <p className="mt-2 text-xs text-slate-400">
+            SCORM ZIP, PDF, MP4, PPTX, or HTML
+            {canBulkUpload
+              ? " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch."
+              : ". Upgrade to Pro to upload multiple packages at once."}
+          </p>
           {selectedFile && !uploadError && (
-            <p className="mt-3 text-sm text-slate-500">{selectedFile.name}</p>
+            <p className="mt-3 text-sm text-slate-500">
+              {selectedFileCount > 1 ? `${selectedFileCount} files selected` : selectedFile.name}
+            </p>
           )}
           {uploadError && <p className="mt-3 text-sm text-red-600">{uploadError}</p>}
         </div>
