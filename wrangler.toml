@@ -42,11 +42,11 @@ ADMIN_EMAILS = "sujoy.guha2@gmail.com"
 APP_BASE_URL = "https://sentoarc.sujoy-guha2.workers.dev"
 SENDGRID_FROM_EMAIL = "sujoy.guha2@gmail.com"
 SENDGRID_FROM_NAME = "SENtoArc"
-# Placeholder Pro pricing (EUR 29/month, EUR 290/year, Stripe Sandbox)
-# until a real price is set -- see CHANGELOG. Not secret: Stripe price
-# IDs carry no account access on their own, only the secret key does.
-STRIPE_PRICE_ID_MONTHLY = "price_1UNUjbCvTE3LMxwL1J4W6fC3"
-STRIPE_PRICE_ID_YEARLY = "price_1UNUjbCvTE3LMxwLh4Ewy4mj"
+# Pro pricing: EUR 19/month, EUR 190/year (Stripe Sandbox). Not secret:
+# Stripe price IDs carry no account access on their own, only the
+# secret key does.
+STRIPE_PRICE_ID_MONTHLY = "price_1UNV3hCvTE3LMxwL7Lfq9VnM"
+STRIPE_PRICE_ID_YEARLY = "price_1UNV3iCvTE3LMxwLnfl8hPTt"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET

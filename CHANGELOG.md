@@ -3,6 +3,19 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] - 2026-10-06
+
+### Changed
+
+- Real Pro pricing: EUR 19/month, EUR 190/year, replacing the EUR
+  29/290 placeholder. Stripe Prices are immutable once created, so
+  this created two new Prices on the existing Pro Product and archived
+  (not deleted) the old two via a new one-off workflow
+  (`.github/workflows/update-stripe-pricing.yml`) -- the Product and
+  webhook endpoint were left untouched to avoid duplicating either.
+  `STRIPE_PRICE_ID_MONTHLY`/`STRIPE_PRICE_ID_YEARLY` updated in
+  `wrangler.toml` accordingly.
+
 ## [0.4.0] - 2026-10-06
 
 ### Added
