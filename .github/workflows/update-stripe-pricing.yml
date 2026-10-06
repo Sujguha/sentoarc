@@ -1,0 +1,108 @@
+name: Update Stripe Pro pricing
+
+# One-off, manually-triggered: replaces the placeholder Pro pricing with
+# real prices. Stripe Prices are immutable once created, so this creates
+# two new Prices on the *existing* Pro Product and archives the old two
+# (active=false) rather than touching the Product or the webhook
+# endpoint -- re-running provision-stripe.yml would duplicate both of
+# those.
+on:
+  workflow_dispatch:
+    inputs:
+      monthly_price_cents:
+        description: "New Pro monthly price, in cents"
+        required: true
+        default: "1900"
+      yearly_price_cents:
+        description: "New Pro yearly price, in cents"
+        required: true
+        default: "19000"
+      currency:
+        description: "Currency code"
+        required: true
+        default: "eur"
+      old_monthly_price_id:
+        description: "Current monthly Price ID to archive"
+        required: true
+        default: "price_1UNUjbCvTE3LMxwL1J4W6fC3"
+      old_yearly_price_id:
+        description: "Current yearly Price ID to archive"
+        required: true
+        default: "price_1UNUjbCvTE3LMxwLh4Ewy4mj"
+
+jobs:
+  update-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create new Prices on the existing Product, archive the old ones
+        id: stripe
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          MONTHLY_CENTS: ${{ inputs.monthly_price_cents }}
+          YEARLY_CENTS: ${{ inputs.yearly_price_cents }}
+          CURRENCY: ${{ inputs.currency }}
+          OLD_MONTHLY_ID: ${{ inputs.old_monthly_price_id }}
+          OLD_YEARLY_ID: ${{ inputs.old_yearly_price_id }}
+        run: |
+          set -e
+          AUTH="Authorization: Basic $(printf '%s:' "$STRIPE_SECRET_KEY" | base64 -w0)"
+
+          echo "Looking up Product from the existing monthly price..."
+          PRODUCT_ID=$(curl -s "https://api.stripe.com/v1/prices/$OLD_MONTHLY_ID" -H "$AUTH" | jq -r .product)
+          if [ "$PRODUCT_ID" = "null" ] || [ -z "$PRODUCT_ID" ]; then
+            echo "Could not resolve product from $OLD_MONTHLY_ID"
+            exit 1
+          fi
+          echo "Product: $PRODUCT_ID"
+
+          echo "Creating new monthly Price..."
+          MONTHLY_JSON=$(curl -s https://api.stripe.com/v1/prices \
+            -H "$AUTH" \
+            -d "product=$PRODUCT_ID" \
+            -d "unit_amount=$MONTHLY_CENTS" \
+            -d "currency=$CURRENCY" \
+            -d "recurring[interval]=month")
+          NEW_MONTHLY_ID=$(echo "$MONTHLY_JSON" | jq -r .id)
+          if [ "$NEW_MONTHLY_ID" = "null" ] || [ -z "$NEW_MONTHLY_ID" ]; then
+            echo "Monthly price creation failed: $MONTHLY_JSON"
+            exit 1
+          fi
+          echo "New monthly price: $NEW_MONTHLY_ID"
+
+          echo "Creating new yearly Price..."
+          YEARLY_JSON=$(curl -s https://api.stripe.com/v1/prices \
+            -H "$AUTH" \
+            -d "product=$PRODUCT_ID" \
+            -d "unit_amount=$YEARLY_CENTS" \
+            -d "currency=$CURRENCY" \
+            -d "recurring[interval]=year")
+          NEW_YEARLY_ID=$(echo "$YEARLY_JSON" | jq -r .id)
+          if [ "$NEW_YEARLY_ID" = "null" ] || [ -z "$NEW_YEARLY_ID" ]; then
+            echo "Yearly price creation failed: $YEARLY_JSON"
+            exit 1
+          fi
+          echo "New yearly price: $NEW_YEARLY_ID"
+
+          echo "Archiving old monthly price ($OLD_MONTHLY_ID)..."
+          curl -s "https://api.stripe.com/v1/prices/$OLD_MONTHLY_ID" -H "$AUTH" -d "active=false" > /dev/null
+
+          echo "Archiving old yearly price ($OLD_YEARLY_ID)..."
+          curl -s "https://api.stripe.com/v1/prices/$OLD_YEARLY_ID" -H "$AUTH" -d "active=false" > /dev/null
+
+          {
+            echo "new_monthly_price_id=$NEW_MONTHLY_ID"
+            echo "new_yearly_price_id=$NEW_YEARLY_ID"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Stripe pricing update results"
+            echo ""
+            echo "| | Old (archived) | New (active) |"
+            echo "|---|---|---|"
+            echo "| Monthly | \`$OLD_MONTHLY_ID\` | \`$NEW_MONTHLY_ID\` ($((MONTHLY_CENTS / 100)) $CURRENCY) |"
+            echo "| Yearly | \`$OLD_YEARLY_ID\` | \`$NEW_YEARLY_ID\` ($((YEARLY_CENTS / 100)) $CURRENCY) |"
+            echo ""
+            echo "New price IDs still need to be copied into \`wrangler.toml\`'s"
+            echo "\`STRIPE_PRICE_ID_MONTHLY\`/\`STRIPE_PRICE_ID_YEARLY\` vars and deployed"
+            echo "-- this workflow only touches Stripe, not the repo."
+          } >> "$GITHUB_STEP_SUMMARY"
