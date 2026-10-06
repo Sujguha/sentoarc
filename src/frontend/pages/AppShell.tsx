@@ -8,6 +8,13 @@ interface JobSummary {
   completedPackages: number;
   failedPackages: number;
   createdAt: string;
+  filenames: string[];
+}
+
+function jobDisplayName(filenames: string[]): string {
+  if (filenames.length === 0) return "—";
+  if (filenames.length === 1) return filenames[0]!;
+  return `${filenames[0]} + ${filenames.length - 1} more`;
 }
 
 interface PackageIssue {
@@ -353,8 +360,11 @@ export default function AppShell() {
             <h2 className="text-lg font-semibold text-slate-900">Recent uploads</h2>
             <ul className="mt-3 divide-y divide-slate-200 rounded-lg border border-slate-200">
               {recentJobs.map((j) => (
-                <li key={j.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                  <span className="text-slate-600">{new Date(j.createdAt).toLocaleString()}</span>
+                <li key={j.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-900">{jobDisplayName(j.filenames)}</p>
+                    <p className="text-slate-500">{new Date(j.createdAt).toLocaleString()}</p>
+                  </div>
                   <StatusBadge status={j.status} />
                 </li>
               ))}

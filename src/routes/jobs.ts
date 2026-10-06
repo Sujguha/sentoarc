@@ -37,7 +37,22 @@ jobsRoute.get("/", requireAuth, async (c) => {
     .orderBy(desc(job.createdAt))
     .limit(limit);
 
-  return c.json({ jobs: rows });
+  const jobIds = rows.map((r) => r.id);
+  const filenamesByJob: Record<string, string[]> = {};
+  if (jobIds.length > 0) {
+    const packages = await db
+      .select({ jobId: pkg.jobId, originalFilename: pkg.originalFilename })
+      .from(pkg)
+      .where(inArray(pkg.jobId, jobIds))
+      .orderBy(pkg.createdAt);
+    for (const p of packages) {
+      (filenamesByJob[p.jobId] ??= []).push(p.originalFilename);
+    }
+  }
+
+  return c.json({
+    jobs: rows.map((r) => ({ ...r, filenames: filenamesByJob[r.id] ?? [] })),
+  });
 });
 
 jobsRoute.get("/:id", requireAuth, async (c) => {

@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.2] - 2026-10-06
+
+### Added
+
+- "Recent uploads" on `/app` now shows the document name, not just the
+  date and status. `GET /api/jobs` returns each job's package
+  filename(s); a bulk job shows the first filename plus a "+N more"
+  count.
+
 ## [0.7.1] - 2026-10-06
 
 ### Changed
