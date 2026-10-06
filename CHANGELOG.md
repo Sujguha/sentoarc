@@ -36,9 +36,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     paid Workers plan, and this account is on the Free plan. Reverted —
     the streaming rewrite above is what actually fixes this, not a
     configured limit, so it isn't needed.
-  - Re-running the same perf-test cases against this fix is the next
-    step, to confirm the 30MB/95MB SCORM cases and the 95MB PDF wrap case
-    now complete.
+  - Verified live: re-ran the same perf-test cases against the deployed
+    fix. All four now complete cleanly (2MB: 17s, 30MB: 22s, 95MB SCORM:
+    33s, 95MB PDF: 36s — previously the 30MB and both 95MB cases never
+    finished at all), with no CPU/memory errors in the Worker logs.
+
+### Investigated
+
+- Re-checked whether WalkMe exposes a public API that could automate the
+  SCORM-into-Learning-Arc import step (the manual step the "Open WalkMe
+  Learning Arc" button exists to shortcut — see 0.3.1). WalkMe does have
+  a real public REST API (`api.walkme.com`, OAuth2 client-credentials
+  auth) — that part of the earlier assessment was outdated. But walking
+  its full documented surface (every category in both the JavaScript API
+  and REST API navigation: Systems, User Provisioning/SCIM, Data
+  Platform, Multi-Language API v1/v2, Discovery Apps, Self-Hosted,
+  Checksum, Activity Log, End User Update, Workstation Notification,
+  Segments (Beta), WalkMe Access API) turned up nothing for Learning Arc,
+  courses, or SCORM content. The API's entire surface is core-platform
+  guidance content, account/user administration, and translation
+  import/export — Learning Arc isn't on it. Conclusion: no automation
+  path exists today through documented means; keeping the current button
+  as-is until that changes (e.g. WalkMe adds Learning Arc API coverage,
+  or confirms a private/partner API exists via direct contact — neither
+  checked here, both would need to come from WalkMe directly).
 
 ## [0.3.1] - 2026-10-05
 
