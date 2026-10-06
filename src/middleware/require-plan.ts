@@ -10,6 +10,7 @@ type PlanTier = HonoVariables["planTier"];
 export interface SubscriptionContext {
   tier: PlanTier;
   retentionDaysOverride: number | null;
+  stripeCustomerId: string | null;
 }
 
 // Shared by the request-time middleware below and the queue consumer
@@ -17,7 +18,12 @@ export interface SubscriptionContext {
 // retention state server-side from D1, never from a client-sent value.
 export async function resolvePlanTierFor(db: Db, ownerType: "user" | "org", ownerId: string): Promise<SubscriptionContext> {
   const [row] = await db
-    .select({ tier: subscription.tier, status: subscription.status, retentionDaysOverride: subscription.retentionDaysOverride })
+    .select({
+      tier: subscription.tier,
+      status: subscription.status,
+      retentionDaysOverride: subscription.retentionDaysOverride,
+      stripeCustomerId: subscription.stripeCustomerId,
+    })
     .from(subscription)
     .where(and(eq(subscription.ownerType, ownerType), eq(subscription.ownerId, ownerId)))
     .limit(1);
@@ -26,6 +32,7 @@ export async function resolvePlanTierFor(db: Db, ownerType: "user" | "org", owne
   return {
     tier: isActive ? (row.tier as PlanTier) : "free",
     retentionDaysOverride: isActive ? (row.retentionDaysOverride ?? null) : null,
+    stripeCustomerId: isActive ? (row.stripeCustomerId ?? null) : null,
   };
 }
 
@@ -51,10 +58,11 @@ export const resolvePlanTier = createMiddleware<AppBindings>(async (c, next) => 
   c.set("orgRole", orgRole);
   c.set("planTier", sub.tier);
   c.set("retentionDaysOverride", sub.retentionDaysOverride);
+  c.set("stripeCustomerId", sub.stripeCustomerId);
   await next();
 });
 
-export function requirePlan(allowed: Array<"free" | "pro" | "enterprise">) {
+export function requirePlan(allowed: Array<"free" | "pro" | "enterprise" | "metered">) {
   return createMiddleware<AppBindings>(async (c, next) => {
     const tier = c.get("planTier");
     if (!allowed.includes(tier)) {

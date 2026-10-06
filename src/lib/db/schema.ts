@@ -94,7 +94,7 @@ export const subscription = sqliteTable("subscription", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePriceId: text("stripe_price_id"),
-  tier: text("tier", { enum: ["free", "pro", "enterprise"] }).notNull().default("free"),
+  tier: text("tier", { enum: ["free", "pro", "enterprise", "metered"] }).notNull().default("free"),
   status: text("status").notNull().default("active"),
   currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
   seats: integer("seats").notNull().default(1),
@@ -158,6 +158,23 @@ export const packageIssue = sqliteTable("package_issue", {
   code: text("code").notNull(),
   message: text("message").notNull(),
   fixApplied: integer("fix_applied", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+// One row per billable upload on the "metered" (pay-as-you-go) tier.
+// Written synchronously at upload time regardless of whether the Stripe
+// report below succeeds, so a Stripe outage never silently drops a
+// billable event -- stripeEventId staying null is what flags a row for
+// manual reconciliation.
+export const meteredUsageEvent = sqliteTable("metered_usage_event", {
+  id: text("id").primaryKey(),
+  ownerType: text("owner_type", { enum: ["user", "org"] }).notNull(),
+  ownerId: text("owner_id").notNull(),
+  jobId: text("job_id").notNull().references(() => job.id, { onDelete: "cascade" }),
+  packageId: text("package_id").notNull().references(() => pkg.id, { onDelete: "cascade" }),
+  sizeBytes: integer("size_bytes").notNull(),
+  mbBilled: integer("mb_billed").notNull(),
+  stripeEventId: text("stripe_event_id"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 

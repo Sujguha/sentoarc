@@ -16,6 +16,20 @@ const tiers = [
     cta: { label: "Sign up free", to: "/sign-up" },
   },
   {
+    name: "Metered",
+    price: "€0.01",
+    cadence: "per MB processed (e.g. 10 MB ≈ €0.10)",
+    description: "Pay as you go — no subscription, no commitment.",
+    features: [
+      "No upload-count limit",
+      "Bulk upload (multiple ZIPs or a ZIP of ZIPs)",
+      "CSV report export",
+      "Translation-path rewrite",
+      "30-day job history",
+    ],
+    cta: { label: "Start pay-as-you-go", to: "/sign-up" },
+  },
+  {
     name: "Pro",
     price: "€19",
     cadence: "per user / month, billed monthly or yearly",
@@ -48,9 +62,9 @@ const tiers = [
 export default function Pricing() {
   return (
     <Layout>
-      <section className="mx-auto max-w-5xl px-6 py-16">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <h1 className="text-center text-3xl font-bold text-slate-900">Pricing</h1>
-        <div className="mt-10 grid gap-6 sm:grid-cols-3">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {tiers.map((tier) => (
             <div
               key={tier.name}

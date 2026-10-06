@@ -6,19 +6,27 @@ import { subscription } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { createStripeClient, createStripeCryptoProvider } from "../lib/billing/stripe-client";
 import type { AppBindings } from "../types/hono";
+import type { Env } from "../types/env";
 
 export const billingRoute = new Hono<AppBindings>();
 
-// Checkout: starts a new Pro subscription, or resumes billing for a user
-// who already has a Stripe customer (e.g. a previously cancelled sub).
-// Seats are fixed at 1 for now -- Enterprise (multi-seat, roles) is a
-// contact-sales flow, not self-serve checkout.
+// Checkout: starts a new Pro or pay-as-you-go subscription, or resumes
+// billing for a user who already has a Stripe customer (e.g. a
+// previously cancelled sub). Seats are fixed at 1 for now -- Enterprise
+// (multi-seat, roles) is a contact-sales flow, not self-serve checkout.
 billingRoute.post("/checkout", requireAuth, async (c) => {
   const user = c.get("user");
-  const body = await c.req.json<{ interval?: "month" | "year" }>().catch(() => ({ interval: undefined }));
-  const interval = body.interval === "year" ? "year" : "month";
+  const body = await c.req
+    .json<{ interval?: "month" | "year"; plan?: "pro" | "metered" }>()
+    .catch(() => ({ interval: undefined, plan: undefined }));
 
-  const priceId = interval === "year" ? c.env.STRIPE_PRICE_ID_YEARLY : c.env.STRIPE_PRICE_ID_MONTHLY;
+  const isMetered = body.plan === "metered";
+  const interval = body.interval === "year" ? "year" : "month";
+  const priceId = isMetered
+    ? c.env.STRIPE_PRICE_ID_METERED
+    : interval === "year"
+      ? c.env.STRIPE_PRICE_ID_YEARLY
+      : c.env.STRIPE_PRICE_ID_MONTHLY;
   if (!priceId) {
     return c.json({ error: "billing_not_configured" }, 503);
   }
@@ -33,7 +41,10 @@ billingRoute.post("/checkout", requireAuth, async (c) => {
   const stripe = createStripeClient(c.env);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
+    // A metered price has no fixed quantity -- Stripe computes it from
+    // reported usage -- so `quantity` must be omitted entirely for it,
+    // unlike the flat Pro prices.
+    line_items: [isMetered ? { price: priceId } : { price: priceId, quantity: 1 }],
     client_reference_id: user.id,
     ...(existing?.stripeCustomerId
       ? { customer: existing.stripeCustomerId }
@@ -108,14 +119,14 @@ billingRoute.post("/webhook", async (c) => {
       if (!ownerId || typeof session.customer !== "string" || typeof session.subscription !== "string") {
         break;
       }
-      await upsertSubscriptionFromStripeSubscription(stripe, db, ownerId, session.customer, session.subscription);
+      await upsertSubscriptionFromStripeSubscription(stripe, db, c.env, ownerId, session.customer, session.subscription);
       break;
     }
 
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const stripeSub = event.data.object as Stripe.Subscription;
-      await syncSubscriptionRow(db, stripeSub);
+      await syncSubscriptionRow(db, c.env, stripeSub);
       break;
     }
 
@@ -129,18 +140,19 @@ billingRoute.post("/webhook", async (c) => {
 async function upsertSubscriptionFromStripeSubscription(
   stripe: Stripe,
   db: ReturnType<typeof createDb>,
+  env: Env,
   ownerId: string,
   stripeCustomerId: string,
   stripeSubscriptionId: string
 ) {
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-  await writeSubscriptionRow(db, "user", ownerId, stripeCustomerId, stripeSub);
+  await writeSubscriptionRow(db, env, "user", ownerId, stripeCustomerId, stripeSub);
 }
 
 // customer.subscription.* events don't carry our internal ownerId, only
 // the Stripe customer/subscription ids -- look up the existing row by
 // stripeCustomerId (set during checkout.session.completed) to find it.
-async function syncSubscriptionRow(db: ReturnType<typeof createDb>, stripeSub: Stripe.Subscription) {
+async function syncSubscriptionRow(db: ReturnType<typeof createDb>, env: Env, stripeSub: Stripe.Subscription) {
   const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer.id;
 
   const [existing] = await db
@@ -151,11 +163,21 @@ async function syncSubscriptionRow(db: ReturnType<typeof createDb>, stripeSub: S
 
   if (!existing) return; // no local row to reconcile (shouldn't happen post-checkout)
 
-  await writeSubscriptionRow(db, existing.ownerType, existing.ownerId, customerId, stripeSub);
+  await writeSubscriptionRow(db, env, existing.ownerType, existing.ownerId, customerId, stripeSub);
+}
+
+// Which of our tiers a Stripe price maps to -- the metered Price id is
+// configured separately from the flat Pro monthly/yearly ones, so a
+// subscription's tier is derived from which price it's actually on,
+// never assumed.
+function tierForPriceId(env: Env, priceId: string | null): "pro" | "metered" {
+  if (priceId && priceId === env.STRIPE_PRICE_ID_METERED) return "metered";
+  return "pro";
 }
 
 async function writeSubscriptionRow(
   db: ReturnType<typeof createDb>,
+  env: Env,
   ownerType: "user" | "org",
   ownerId: string,
   stripeCustomerId: string,
@@ -163,7 +185,8 @@ async function writeSubscriptionRow(
 ) {
   const now = new Date();
   const priceId = stripeSub.items.data[0]?.price.id ?? null;
-  const tier = stripeSub.status === "canceled" || stripeSub.status === "incomplete_expired" ? "free" : "pro";
+  const tier =
+    stripeSub.status === "canceled" || stripeSub.status === "incomplete_expired" ? "free" : tierForPriceId(env, priceId);
 
   const [existing] = await db
     .select({ id: subscription.id })
@@ -175,7 +198,7 @@ async function writeSubscriptionRow(
     stripeCustomerId,
     stripeSubscriptionId: stripeSub.id,
     stripePriceId: priceId,
-    tier: tier as "free" | "pro",
+    tier: tier as "free" | "pro" | "metered",
     status: stripeSub.status,
     currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
     seats: stripeSub.items.data[0]?.quantity ?? 1,

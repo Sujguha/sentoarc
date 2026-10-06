@@ -109,10 +109,10 @@ export default function AppShell() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
-  const [tier, setTier] = useState<"free" | "pro" | "enterprise">("free");
+  const [tier, setTier] = useState<"free" | "pro" | "enterprise" | "metered">("free");
   const [workspace, setWorkspace] = useState<ActiveWorkspace | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isProOrEnterprise = tier === "pro" || tier === "enterprise";
+  const isProOrEnterprise = tier === "pro" || tier === "enterprise" || tier === "metered";
   const isViewer = workspace?.role === "viewer";
 
   useEffect(() => {

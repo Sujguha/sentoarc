@@ -6,6 +6,8 @@ import { requireAuth } from "../middleware/require-auth";
 import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
 import { computeRetentionExpiresAt } from "../lib/retention";
 import { logAudit } from "../lib/audit";
+import { createStripeClient } from "../lib/billing/stripe-client";
+import { reportMeteredUsage } from "../lib/billing/metered-usage";
 import type { AppBindings } from "../types/hono";
 import type { ProcessingQueueMessage } from "../types/env";
 
@@ -131,7 +133,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
 // entries are themselves ZIPs — that's auto-detected and expanded by the
 // queue consumer instead). Each returned uploadUrl is the same
 // PUT /:packageId/file endpoint used by a single upload.
-uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise"]), async (c) => {
+uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise", "metered"]), async (c) => {
   const user = c.get("user");
   const tier = c.get("planTier");
   const ownerType = c.get("ownerType");
@@ -290,6 +292,25 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
   }
 
   await c.env.PACKAGES_BUCKET.put(row.r2KeyUpload, body);
+
+  if (tier === "metered") {
+    // Best-effort end to end: billing reporting (Stripe call or the
+    // local audit-trail insert) must never block the upload pipeline
+    // the user is actually paying for.
+    try {
+      await reportMeteredUsage(createStripeClient(c.env), db, {
+        ownerType,
+        ownerId,
+        jobId: row.jobId,
+        packageId,
+        sizeBytes: body.byteLength,
+        stripeCustomerId: c.get("stripeCustomerId"),
+        meterEventName: c.env.STRIPE_METER_EVENT_NAME,
+      });
+    } catch (err) {
+      console.error(`Failed to record metered usage for package ${packageId}`, err);
+    }
+  }
 
   const now = new Date();
   await db.update(pkg).set({ status: "queued", updatedAt: now }).where(eq(pkg.id, packageId));

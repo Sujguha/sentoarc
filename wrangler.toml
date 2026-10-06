@@ -47,6 +47,13 @@ SENDGRID_FROM_NAME = "SENtoArc"
 # secret key does.
 STRIPE_PRICE_ID_MONTHLY = "price_1UNV3hCvTE3LMxwL7Lfq9VnM"
 STRIPE_PRICE_ID_YEARLY = "price_1UNV3iCvTE3LMxwLnfl8hPTt"
+# Pay-as-you-go: left empty until a metered Price + Billing Meter exist in
+# the Stripe dashboard (test mode) -- checkout returns
+# "billing_not_configured" while STRIPE_PRICE_ID_METERED is unset, same
+# as the Pro prices above would if cleared. STRIPE_METER_EVENT_NAME must
+# match the event_name chosen when creating that Meter.
+STRIPE_PRICE_ID_METERED = ""
+STRIPE_METER_EVENT_NAME = "scorm_mb_processed"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET

@@ -96,6 +96,44 @@ describe("POST /api/billing/webhook", () => {
     expect(row?.stripeSubscriptionId).toBe("sub_test_1");
   });
 
+  it("sets tier to metered when the subscription's price id matches the configured metered price", async () => {
+    const db = createDb(env.DB);
+    const now = new Date();
+    await db.insert(subscription).values({
+      id: crypto.randomUUID(),
+      ownerType: "user",
+      ownerId: "test-user-metered",
+      stripeCustomerId: "cus_test_metered",
+      stripeSubscriptionId: "sub_old_metered",
+      stripePriceId: null,
+      tier: "free",
+      status: "incomplete",
+      seats: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const payload = subscriptionUpdatedEvent({
+      customer: "cus_test_metered",
+      items: { data: [{ price: { id: "price_test_metered" }, quantity: undefined }] },
+    });
+    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
+    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+
+    const [row] = await db
+      .select()
+      .from(subscription)
+      .where(eq(subscription.stripeCustomerId, "cus_test_metered"))
+      .limit(1);
+    expect(row?.tier).toBe("metered");
+    expect(row?.stripePriceId).toBe("price_test_metered");
+  });
+
   it("downgrades to free when the subscription is cancelled", async () => {
     const db = createDb(env.DB);
     const now = new Date();

@@ -10,8 +10,8 @@ import type { AppBindings } from "../src/types/hono";
 async function seedSubscription(
   ownerType: "user" | "org",
   ownerId: string,
-  tier: "free" | "pro" | "enterprise",
-  opts: { status?: string; retentionDaysOverride?: number | null } = {}
+  tier: "free" | "pro" | "enterprise" | "metered",
+  opts: { status?: string; retentionDaysOverride?: number | null; stripeCustomerId?: string | null } = {}
 ) {
   const db = createDb(env.DB);
   const now = new Date();
@@ -22,6 +22,7 @@ async function seedSubscription(
     tier,
     status: opts.status ?? "active",
     retentionDaysOverride: opts.retentionDaysOverride ?? null,
+    stripeCustomerId: opts.stripeCustomerId ?? null,
     createdAt: now,
     updatedAt: now,
   });
@@ -51,7 +52,7 @@ async function seedUser(): Promise<string> {
 // themselves are the real production middleware.
 function appWithFakeUser(
   userId: string,
-  allowed: Array<"free" | "pro" | "enterprise">,
+  allowed: Array<"free" | "pro" | "enterprise" | "metered">,
   activeOrganizationId: string | null = null
 ) {
   const fakeAuth = createMiddleware<AppBindings>(async (c, next) => {
@@ -109,6 +110,23 @@ describe("resolvePlanTierFor", () => {
     const result = await resolvePlanTierFor(db, "org", ownerId);
     expect(result.retentionDaysOverride).toBeNull();
   });
+
+  it("returns the metered tier and the owner's Stripe customer id", async () => {
+    const ownerId = crypto.randomUUID();
+    await seedSubscription("user", ownerId, "metered", { stripeCustomerId: "cus_test_abc" });
+    const db = createDb(env.DB);
+    const result = await resolvePlanTierFor(db, "user", ownerId);
+    expect(result.tier).toBe("metered");
+    expect(result.stripeCustomerId).toBe("cus_test_abc");
+  });
+
+  it("ignores a Stripe customer id on a canceled subscription", async () => {
+    const ownerId = crypto.randomUUID();
+    await seedSubscription("user", ownerId, "metered", { status: "canceled", stripeCustomerId: "cus_test_abc" });
+    const db = createDb(env.DB);
+    const result = await resolvePlanTierFor(db, "user", ownerId);
+    expect(result.stripeCustomerId).toBeNull();
+  });
 });
 
 describe("requirePlan", () => {
@@ -126,6 +144,22 @@ describe("requirePlan", () => {
     const app = appWithFakeUser(ownerId, ["pro", "enterprise"]);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(200);
+  });
+
+  it("allows a metered-tier caller through a route gated to pro/enterprise/metered", async () => {
+    const ownerId = crypto.randomUUID();
+    await seedSubscription("user", ownerId, "metered");
+    const app = appWithFakeUser(ownerId, ["pro", "enterprise", "metered"]);
+    const res = await app.request("/gated", {}, env);
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks a metered-tier caller from a route not gated to include metered", async () => {
+    const ownerId = crypto.randomUUID();
+    await seedSubscription("user", ownerId, "metered");
+    const app = appWithFakeUser(ownerId, ["pro", "enterprise"]);
+    const res = await app.request("/gated", {}, env);
+    expect(res.status).toBe(403);
   });
 });
 

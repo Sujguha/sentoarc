@@ -3,6 +3,48 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-10-06
+
+### Added
+
+- Fourth billing tier: **Metered** (pay-as-you-go), alongside Free, Pro,
+  and Enterprise. No subscription commitment, no upload-count limit — a
+  Stripe metered Price billed on reported usage instead of a flat fee,
+  at the same feature level as Pro (bulk upload, CSV export,
+  translation-path rewrite, 30-day retention).
+  - `subscription.tier` widened to include `"metered"`; `requirePlan`
+    and every existing Pro/Enterprise gate (bulk upload, CSV export,
+    translation-path rewrite, retention window) now also admits it.
+  - New `metered_usage_event` table (migration `0005`) is the local
+    audit trail for every billable upload — written synchronously at
+    upload time regardless of whether the Stripe report succeeds, so a
+    Stripe outage never silently drops a billable event.
+  - `src/lib/billing/metered-usage.ts`: reports usage to Stripe's
+    Billing Meters API (`stripe.billing.meterEvents.create`) in MB,
+    rounded up (a sub-1MB file still costs processing time, so it's
+    never billed as zero). The package id doubles as the meter event's
+    idempotency key, so a retried upload can't be double-billed.
+    Reporting is best-effort end to end (DB insert and Stripe call both
+    wrapped) — it must never block the upload pipeline the user is
+    paying for.
+  - `POST /api/billing/checkout` accepts `{ plan: "metered" }` as an
+    alternative to `{ interval }`; a metered Stripe Price takes no fixed
+    `quantity` in its checkout line item, unlike the flat Pro prices.
+  - The webhook handler no longer assumes every active subscription is
+    Pro — tier is derived from which Stripe Price the subscription is
+    actually on (`STRIPE_PRICE_ID_METERED` vs. the Pro monthly/yearly
+    ones), read fresh from the event every time.
+  - `GET /api/usage` surfaces a lifetime MB-billed total for metered
+    accounts; exact current-period charges are Stripe's own job (the
+    existing "Manage billing" portal link).
+  - Pricing page, Account page (new "Start pay-as-you-go" button), and
+    `/app`'s feature gating all updated for the fourth tier.
+  - `STRIPE_PRICE_ID_METERED` / `STRIPE_METER_EVENT_NAME` added to
+    `wrangler.toml`, left empty/default until a metered Price and
+    Billing Meter are created in the Stripe dashboard — checkout
+    returns `billing_not_configured` until then, same as Pro would with
+    its price ids cleared.
+
 ## [0.8.0] - 2026-10-06
 
 ### Added

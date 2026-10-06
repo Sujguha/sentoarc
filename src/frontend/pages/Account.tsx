@@ -7,6 +7,7 @@ interface Usage {
   freeUploadLimit: number;
   freeUploadsUsed: number;
   freeUploadsRemaining: number;
+  meteredMbBilledLifetime: number | null;
 }
 
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
@@ -14,7 +15,7 @@ const checkoutParam = new URLSearchParams(window.location.search).get("checkout"
 export default function Account() {
   const { data: session } = useSession();
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [billingBusy, setBillingBusy] = useState<"month" | "year" | "portal" | null>(null);
+  const [billingBusy, setBillingBusy] = useState<"month" | "year" | "metered" | "portal" | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,20 +25,21 @@ export default function Account() {
       .catch(() => setUsage(null));
   }, []);
 
-  async function startCheckout(interval: "month" | "year") {
-    setBillingBusy(interval);
+  async function startCheckout(selection: { interval: "month" | "year" } | { plan: "metered" }) {
+    const busyKey = "plan" in selection ? selection.plan : selection.interval;
+    setBillingBusy(busyKey);
     setBillingError(null);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval }),
+        body: JSON.stringify(selection),
       });
       const body = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !body.url) {
         setBillingError(
           body.error === "billing_not_configured"
-            ? "Pro upgrades aren't available yet — check back soon."
+            ? "That plan isn't available to self-serve yet — check back soon."
             : "Couldn't start checkout — please try again."
         );
         setBillingBusy(null);
@@ -93,22 +95,35 @@ export default function Account() {
                 {usage.freeUploadsUsed} / {usage.freeUploadLimit} free uploads used
               </p>
             )}
+            {usage.tier === "metered" && usage.meteredMbBilledLifetime !== null && (
+              <p className="mt-1 text-sm text-slate-600">
+                {usage.meteredMbBilledLifetime} MB processed lifetime (€{(usage.meteredMbBilledLifetime * 0.01).toFixed(2)}
+                ) — see "Manage billing" for this period's exact charges
+              </p>
+            )}
 
             {usage.tier === "free" ? (
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  onClick={() => startCheckout("month")}
+                  onClick={() => startCheckout({ interval: "month" })}
                   disabled={billingBusy !== null}
                   className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
                 >
                   {billingBusy === "month" ? "Redirecting…" : "Upgrade to Pro (monthly)"}
                 </button>
                 <button
-                  onClick={() => startCheckout("year")}
+                  onClick={() => startCheckout({ interval: "year" })}
                   disabled={billingBusy !== null}
                   className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
                 >
                   {billingBusy === "year" ? "Redirecting…" : "Upgrade to Pro (yearly)"}
+                </button>
+                <button
+                  onClick={() => startCheckout({ plan: "metered" })}
+                  disabled={billingBusy !== null}
+                  className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                >
+                  {billingBusy === "metered" ? "Redirecting…" : "Start pay-as-you-go"}
                 </button>
               </div>
             ) : (

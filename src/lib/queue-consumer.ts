@@ -140,8 +140,8 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   if (detection.type === "scorm-zip") {
     const tier = await resolveOwnerTier(db, message.jobId);
     const result = fixPackage(bytes, detection.names!, {
-      // Pro/Enterprise only -- see ValidatePackageOptions.
-      checkTranslationPaths: tier === "pro" || tier === "enterprise",
+      // Pro/Enterprise/metered only -- see ValidatePackageOptions.
+      checkTranslationPaths: tier === "pro" || tier === "enterprise" || tier === "metered",
     });
 
     let r2KeyFixed: string | null = null;
@@ -202,7 +202,7 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   });
 }
 
-async function resolveOwnerTier(db: Db, jobId: string): Promise<"free" | "pro" | "enterprise"> {
+async function resolveOwnerTier(db: Db, jobId: string): Promise<"free" | "pro" | "enterprise" | "metered"> {
   const [jobRow] = await db
     .select({ ownerType: job.ownerType, ownerId: job.ownerId })
     .from(job)

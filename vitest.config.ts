@@ -21,6 +21,11 @@ export default defineWorkersConfig(async () => {
               // nothing in the test suite calls out to Stripe's API.
               STRIPE_SECRET_KEY: "not-a-real-key--vitest-placeholder",
               STRIPE_WEBHOOK_SECRET: "not-a-real-secret--vitest-placeholder",
+              // wrangler.toml leaves this empty (no metered Price exists
+              // yet) -- tests need a stable, known value to assert tier
+              // resolution picks "metered" for a subscription on this
+              // exact price id and "pro" for any other.
+              STRIPE_PRICE_ID_METERED: "price_test_metered",
             },
           },
         },
