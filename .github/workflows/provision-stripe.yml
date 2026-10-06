@@ -1,0 +1,140 @@
+name: Provision Stripe (Product/Prices, webhook, Worker secrets)
+
+# One-off, manually-triggered: creates the SENtoArc Pro Product + two
+# Prices (placeholder EUR pricing -- see CHANGELOG), registers a webhook
+# endpoint pointing at the deployed Worker, and pushes STRIPE_SECRET_KEY
+# + the webhook's signing secret into Cloudflare as Worker secrets.
+#
+# Uses plain curl against Stripe's REST API (Basic auth with the secret
+# key) rather than the stripe CLI, which isn't preinstalled on the
+# runner. Safe to re-run: re-running creates a *new* Product/Prices/
+# webhook rather than erroring, so if re-run is needed, delete the
+# previous ones in the Stripe dashboard first to avoid duplicates.
+on:
+  workflow_dispatch:
+    inputs:
+      monthly_price_cents:
+        description: "Pro monthly price, in cents (placeholder; easy to change later in the Stripe dashboard)"
+        required: true
+        default: "2900"
+      yearly_price_cents:
+        description: "Pro yearly price, in cents (placeholder)"
+        required: true
+        default: "29000"
+      currency:
+        description: "Currency code"
+        required: true
+        default: "eur"
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Create Product + Prices, register webhook
+        id: stripe
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          MONTHLY_CENTS: ${{ inputs.monthly_price_cents }}
+          YEARLY_CENTS: ${{ inputs.yearly_price_cents }}
+          CURRENCY: ${{ inputs.currency }}
+        run: |
+          set -e
+          AUTH="Authorization: Basic $(printf '%s:' "$STRIPE_SECRET_KEY" | base64 -w0)"
+
+          echo "Creating Product..."
+          PRODUCT_JSON=$(curl -s https://api.stripe.com/v1/products \
+            -H "$AUTH" \
+            -d "name=SENtoArc Pro" \
+            -d "description=Unlimited SCORM package uploads, bulk upload, CSV export, 30-day history")
+          PRODUCT_ID=$(echo "$PRODUCT_JSON" | jq -r .id)
+          if [ "$PRODUCT_ID" = "null" ] || [ -z "$PRODUCT_ID" ]; then
+            echo "Product creation failed: $PRODUCT_JSON"
+            exit 1
+          fi
+          echo "Product: $PRODUCT_ID"
+
+          echo "Creating monthly Price..."
+          MONTHLY_JSON=$(curl -s https://api.stripe.com/v1/prices \
+            -H "$AUTH" \
+            -d "product=$PRODUCT_ID" \
+            -d "unit_amount=$MONTHLY_CENTS" \
+            -d "currency=$CURRENCY" \
+            -d "recurring[interval]=month")
+          MONTHLY_PRICE_ID=$(echo "$MONTHLY_JSON" | jq -r .id)
+          if [ "$MONTHLY_PRICE_ID" = "null" ] || [ -z "$MONTHLY_PRICE_ID" ]; then
+            echo "Monthly price creation failed: $MONTHLY_JSON"
+            exit 1
+          fi
+          echo "Monthly price: $MONTHLY_PRICE_ID"
+
+          echo "Creating yearly Price..."
+          YEARLY_JSON=$(curl -s https://api.stripe.com/v1/prices \
+            -H "$AUTH" \
+            -d "product=$PRODUCT_ID" \
+            -d "unit_amount=$YEARLY_CENTS" \
+            -d "currency=$CURRENCY" \
+            -d "recurring[interval]=year")
+          YEARLY_PRICE_ID=$(echo "$YEARLY_JSON" | jq -r .id)
+          if [ "$YEARLY_PRICE_ID" = "null" ] || [ -z "$YEARLY_PRICE_ID" ]; then
+            echo "Yearly price creation failed: $YEARLY_JSON"
+            exit 1
+          fi
+          echo "Yearly price: $YEARLY_PRICE_ID"
+
+          echo "Creating webhook endpoint..."
+          WEBHOOK_JSON=$(curl -s https://api.stripe.com/v1/webhook_endpoints \
+            -H "$AUTH" \
+            -d "url=https://sentoarc.sujoy-guha2.workers.dev/api/billing/webhook" \
+            -d "enabled_events[]=checkout.session.completed" \
+            -d "enabled_events[]=customer.subscription.updated" \
+            -d "enabled_events[]=customer.subscription.deleted")
+          WEBHOOK_SECRET=$(echo "$WEBHOOK_JSON" | jq -r .secret)
+          WEBHOOK_ID=$(echo "$WEBHOOK_JSON" | jq -r .id)
+          if [ "$WEBHOOK_SECRET" = "null" ] || [ -z "$WEBHOOK_SECRET" ]; then
+            echo "Webhook endpoint creation failed: $WEBHOOK_JSON"
+            exit 1
+          fi
+          echo "Webhook endpoint: $WEBHOOK_ID"
+
+          # Mask the secret in logs, then expose values to later steps.
+          echo "::add-mask::$WEBHOOK_SECRET"
+          {
+            echo "product_id=$PRODUCT_ID"
+            echo "monthly_price_id=$MONTHLY_PRICE_ID"
+            echo "yearly_price_id=$YEARLY_PRICE_ID"
+            echo "webhook_id=$WEBHOOK_ID"
+          } >> "$GITHUB_OUTPUT"
+          echo "webhook_secret=$WEBHOOK_SECRET" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Stripe provisioning results"
+            echo ""
+            echo "| Resource | ID |"
+            echo "|---|---|"
+            echo "| Product | \`$PRODUCT_ID\` |"
+            echo "| Monthly price ($((MONTHLY_CENTS / 100)) $CURRENCY) | \`$MONTHLY_PRICE_ID\` |"
+            echo "| Yearly price ($((YEARLY_CENTS / 100)) $CURRENCY) | \`$YEARLY_PRICE_ID\` |"
+            echo "| Webhook endpoint | \`$WEBHOOK_ID\` |"
+            echo ""
+            echo "Price IDs above need to be copied into \`wrangler.toml\`'s"
+            echo "\`STRIPE_PRICE_ID_MONTHLY\`/\`STRIPE_PRICE_ID_YEARLY\` vars and"
+            echo "deployed. The webhook signing secret and the Stripe secret key"
+            echo "have been pushed to Cloudflare as Worker secrets by this run."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push secrets to Cloudflare Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          WEBHOOK_SECRET: ${{ steps.stripe.outputs.webhook_secret }}
+        run: |
+          printf '%s' "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY
+          printf '%s' "$WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET
