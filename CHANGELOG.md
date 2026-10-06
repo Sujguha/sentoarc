@@ -3,6 +3,41 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-10-06
+
+### Added
+
+- Data retention is now actually enforced -- `scheduled()` in
+  `src/index.ts` was a literal stub (`console.log("scheduled cron
+  fired")`) since the original scaffold; the 24h-Free/30-day-Pro
+  retention named in `wrangler.toml`'s vars and the pricing copy was
+  never backed by any code, so nothing ever purged old jobs from D1 or
+  R2. New `src/lib/retention.ts`:
+  - `computeRetentionExpiresAt`: called at job creation (both
+    `/api/uploads/init` and `/api/uploads/bulk/init`, using the tier
+    already resolved there) to stamp `job.retentionExpiresAt` --
+    computed once at creation, not at completion, so a job that never
+    finishes processing still gets cleaned up on schedule.
+  - `purgeExpiredJobs`: deletes every job (and its packages, issues, R2
+    objects) whose `retentionExpiresAt` has passed. A job created
+    before this shipped has `retentionExpiresAt = NULL` and is left
+    alone rather than purged immediately.
+  - `sweepAbandonedUploads`: separately cleans up a reservation
+    (`POST .../init` ran, the file's `PUT` never did) stuck at
+    `job.status = "queued"` past a fixed 1-hour grace period --
+    doesn't wait out the full tier retention window, since there's no
+    real uploaded data there to begin with.
+  - `deleteJobAndArtifacts` (the actual deletion logic) is shared with
+    `DELETE /api/jobs/:id`, which used to duplicate it inline.
+  - The hourly cron (`wrangler.toml`'s existing `[triggers]`) now calls
+    both sweeps instead of logging a placeholder string.
+  - 11 new tests against real D1/R2 bindings
+    (`test/retention.test.ts`); verified live that `retentionExpiresAt`
+    is actually populated on a real upload
+    (`e2e-upload-test.yml`) -- the cron's own firing isn't practical to
+    trigger on demand against a deployed Worker, so that side relies on
+    the unit tests against the same D1/R2 bindings the cron itself uses.
+
 ## [0.6.0] - 2026-10-06
 
 ### Fixed

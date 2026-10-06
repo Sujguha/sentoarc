@@ -4,6 +4,7 @@ import { createDb } from "../lib/db/client";
 import { job, pkg, packageIssue } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
+import { deleteJobAndArtifacts } from "../lib/retention";
 import type { AppBindings } from "../types/hono";
 
 export const jobsRoute = new Hono<AppBindings>();
@@ -173,22 +174,7 @@ jobsRoute.delete("/:id", requireAuth, async (c) => {
     return c.json({ error: "not_found" }, 404);
   }
 
-  const packages = await db
-    .select({ id: pkg.id, r2KeyUpload: pkg.r2KeyUpload, r2KeyFixed: pkg.r2KeyFixed })
-    .from(pkg)
-    .where(eq(pkg.jobId, jobId));
-
-  const keysToDelete = packages.flatMap((p) => [p.r2KeyUpload, p.r2KeyFixed].filter((k): k is string => !!k));
-  if (keysToDelete.length > 0) {
-    await c.env.PACKAGES_BUCKET.delete(keysToDelete);
-  }
-
-  const packageIds = packages.map((p) => p.id);
-  if (packageIds.length > 0) {
-    await db.delete(packageIssue).where(inArray(packageIssue.packageId, packageIds));
-    await db.delete(pkg).where(inArray(pkg.id, packageIds));
-  }
-  await db.delete(job).where(eq(job.id, jobId));
+  await deleteJobAndArtifacts(db, c.env.PACKAGES_BUCKET, jobId);
 
   return c.json({ ok: true });
 });

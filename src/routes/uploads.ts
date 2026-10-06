@@ -4,6 +4,7 @@ import { createDb } from "../lib/db/client";
 import { job, pkg, usageCounter } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
+import { computeRetentionExpiresAt } from "../lib/retention";
 import type { AppBindings } from "../types/hono";
 import type { ProcessingQueueMessage } from "../types/env";
 
@@ -86,6 +87,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
     totalPackages: 1,
     completedPackages: 0,
     failedPackages: 0,
+    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now),
     createdAt: now,
     updatedAt: now,
   });
@@ -110,6 +112,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
 // PUT /:packageId/file endpoint used by a single upload.
 uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise"]), async (c) => {
   const user = c.get("user");
+  const tier = c.get("planTier");
   const body = await c.req.json<{ files?: { filename?: string; sizeBytes?: number }[] }>().catch(() => null);
 
   if (!body?.files || !Array.isArray(body.files) || body.files.length === 0) {
@@ -153,6 +156,7 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
     totalPackages: prepared.length,
     completedPackages: 0,
     failedPackages: 0,
+    retentionExpiresAt: computeRetentionExpiresAt(tier, c.env, now),
     createdAt: now,
     updatedAt: now,
   });

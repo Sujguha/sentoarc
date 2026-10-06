@@ -143,6 +143,16 @@ jobs:
             exit 1
           fi
 
+          # Retention is computed at job creation (uploads.ts), not at
+          # completion -- confirms it's actually wired, not just present
+          # in the schema. Free tier -> ~FREE_RETENTION_HOURS from now.
+          RETENTION_EXPIRES_AT=$(jq -r '.job.retentionExpiresAt' job.json)
+          if [ "$RETENTION_EXPIRES_AT" = "null" ] || [ -z "$RETENTION_EXPIRES_AT" ]; then
+            echo "::error::job.retentionExpiresAt was not set -- retention purge has nothing to act on for this job"
+            exit 1
+          fi
+          echo "job.retentionExpiresAt: $RETENTION_EXPIRES_AT (free-tier retention is wired)"
+
       - name: Download the fixed ZIP
         run: |
           HTTP_CODE=$(curl -s -o fixed.zip -w "%{http_code}" -b cookies.txt \

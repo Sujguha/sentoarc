@@ -8,6 +8,8 @@ import { uploadsRoute } from "./routes/uploads";
 import { jobsRoute } from "./routes/jobs";
 import { billingRoute } from "./routes/billing";
 import { processPackageMessage } from "./lib/queue-consumer";
+import { createDb } from "./lib/db/client";
+import { purgeExpiredJobs, sweepAbandonedUploads } from "./lib/retention";
 import type { AppBindings } from "./types/hono";
 import type { Env, ProcessingQueueMessage } from "./types/env";
 
@@ -48,8 +50,13 @@ export default {
     }
   },
 
-  // Phase 3 adds the retention purge + abandoned-upload-reservation sweep.
-  async scheduled(_event: ScheduledEvent, _env: Env) {
-    console.log("scheduled cron fired");
+  async scheduled(_event: ScheduledEvent, env: Env) {
+    const db = createDb(env.DB);
+    const now = new Date();
+
+    const purged = await purgeExpiredJobs(db, env.PACKAGES_BUCKET, now);
+    const swept = await sweepAbandonedUploads(db, env.PACKAGES_BUCKET, now);
+
+    console.log(`retention cron: purged ${purged} expired job(s), swept ${swept} abandoned upload(s)`);
   },
 };
