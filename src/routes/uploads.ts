@@ -27,9 +27,9 @@ export const uploadsRoute = new Hono<AppBindings>();
 // the queue consumer sniffs real file content via detectFileType()
 // before processing, so a mislabeled extension is rejected there, not
 // trusted here.
-const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
+export const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
 
-function extensionOf(filename: string): string | null {
+export function extensionOf(filename: string): string | null {
   const lower = filename.toLowerCase();
   return ALLOWED_EXTENSIONS.find((ext) => lower.endsWith(ext)) ?? null;
 }

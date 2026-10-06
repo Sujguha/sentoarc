@@ -126,6 +126,49 @@ describe("processPackageMessage: zip-of-zips expansion", () => {
   });
 });
 
+describe("processPackageMessage: wrong/mismatched file type", () => {
+  // The extension allowlist in uploads.ts (tested separately in
+  // uploads.test.ts) is only a shallow first gate -- it trusts the
+  // filename, not the content. This is the real guard: a file whose
+  // actual bytes don't match any recognized format must still fail
+  // cleanly here, end-to-end through the real pipeline, regardless of
+  // what the uploader named it or claimed it was.
+  it("fails cleanly when the uploaded content matches no recognized format at all", async () => {
+    const plainText = strToU8("This is just a plain text file, not a SCORM package, PDF, MP4, or PPTX.");
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", plainText);
+    const db = createDb(env.DB);
+
+    await expect(processPackageMessage({ type: "process", jobId, packageId, r2Key }, env)).resolves.toBeUndefined();
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("failed");
+    expect(pkgRow?.errorMessage).toMatch(/recognized format/i);
+
+    const issues = await db.select().from(packageIssue).where(eq(packageIssue.packageId, packageId));
+    expect(issues.some((i) => i.code === "UNSUPPORTED_FILE_TYPE")).toBe(true);
+
+    const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
+    expect(jobRow?.status).toBe("failed");
+  });
+
+  // A zip file is the one format whose "is this really a zip" check and
+  // "is this really a SCORM package" check are two different layers --
+  // a well-formed zip with no imsmanifest.xml (e.g. someone zips up an
+  // unrelated folder and uploads it) passes the zip-parsing layer fine
+  // but still isn't usable content.
+  it("fails cleanly for a well-formed ZIP that isn't a SCORM package, PPTX, or web bundle", async () => {
+    const zip = buildZip({ "notes.txt": strToU8("just some notes, not a course") });
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", zip);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("failed");
+    expect(pkgRow?.errorMessage).toMatch(/recognized format/i);
+  });
+});
+
 describe("processPackageMessage: corrupted/unreadable input", () => {
   // Regression test: file-type detection only scans a zip's central
   // directory (never inflates -- see listZipEntries), so a zip whose

@@ -3,6 +3,29 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.3] - 2026-10-06
+
+### Added
+
+- Closed two "wrong file type" test gaps found by auditing coverage,
+  not just adding tests for their own sake: the pure `detectFileType`
+  unit tests ("garbage bytes → unknown") existed, but neither actual
+  place a user hits this had end-to-end coverage.
+  - `test/uploads.test.ts` (new): the upload route's filename-extension
+    allowlist (`extensionOf`, now exported) — accepts every allowed
+    extension case-insensitively, rejects an executable/text file/no
+    extension, and specifically rejects deceptive filenames
+    (`course.zip.exe`, `course.zipper`) that a naive "contains" check
+    (instead of a true suffix check) would have let through.
+  - `test/queue-consumer.test.ts`: end-to-end through the real
+    pipeline — plain content that matches no recognized format at all,
+    and a well-formed ZIP that isn't a SCORM package/PPTX/web bundle
+    (e.g. someone zips up an unrelated folder), both resolve to a clean
+    `failed` status with `UNSUPPORTED_FILE_TYPE`, not just a correct
+    return value from the detector in isolation. This is the check that
+    actually matters (the extension allowlist is explicitly a shallow
+    first gate in its own code comment — content is what's trusted).
+
 ## [0.9.2] - 2026-10-06
 
 ### Fixed
