@@ -47,9 +47,11 @@ SENDGRID_FROM_NAME = "SENtoArc"
 # secret key does.
 STRIPE_PRICE_ID_MONTHLY = "price_1UNV3hCvTE3LMxwL7Lfq9VnM"
 STRIPE_PRICE_ID_YEARLY = "price_1UNV3iCvTE3LMxwLnfl8hPTt"
-# Pay-as-you-go: EUR 0.01 per MB processed (Stripe Sandbox), attached to
-# the "scorm_mb_processed" Billing Meter.
-STRIPE_PRICE_ID_METERED = "price_1UNfxCCvTE3LMxwLAptee6lv"
+# Pay-as-you-go: EUR 0.01 per MB processed (Stripe Sandbox), under its
+# own "SENtoArc Pay-as-you-go" product (not the flat-Pro one -- Checkout
+# shows the product's own name/description, so sharing the Pro product
+# made checkout say "Subscribe to SENtoArc Pro" for this plan too).
+STRIPE_PRICE_ID_METERED = "price_1UNgNKCvTE3LMxwLUNAErE2X"
 STRIPE_METER_EVENT_NAME = "scorm_mb_processed"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
