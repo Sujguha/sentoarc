@@ -17,8 +17,8 @@ const tiers = [
   },
   {
     name: "Pro",
-    price: "Per user",
-    cadence: "monthly or yearly",
+    price: "€19",
+    cadence: "per user / month, billed monthly or yearly",
     description: "For ongoing migrations.",
     features: [
       "Unlimited uploads",
