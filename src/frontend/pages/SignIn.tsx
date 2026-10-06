@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { PasswordInput } from "../components/PasswordInput";
 import { authClient } from "../lib/auth-client";
 
 // Only ever used as a same-origin client-side route (react-router
@@ -71,7 +72,7 @@ export default function SignIn() {
         {mode === "password" ? (
           <form onSubmit={handlePasswordSignIn} className="mt-6 space-y-4">
             <input name="email" required type="email" placeholder="Email" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-            <input name="password" required type="password" placeholder="Password" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <PasswordInput name="password" required placeholder="Password" />
             <button type="submit" disabled={submitting} className="w-full rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-50">
               {submitting ? "Signing in…" : "Sign in"}
             </button>
