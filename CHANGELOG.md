@@ -3,6 +3,19 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.1] - 2026-10-06
+
+### Changed
+
+- WalkMe Learning Arc deep link now points at the real Assets > SCORM
+  Packages page (`app.learningarc.com/management/assets`), confirmed
+  from a real account screenshot — previously just the generic app
+  base URL (see 0.3.1). The Import SCORM package dialog itself is
+  client-side state with no URL of its own (the address bar doesn't
+  change when it opens), so this is as far as a plain link can reach;
+  the user still clicks "+ Learning Asset" / Import themselves once
+  there. Button text updated to "Open Import SCORM in WalkMe" to match.
+
 ## [0.7.0] - 2026-10-06
 
 ### Added

@@ -51,9 +51,12 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 // We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
 // WalkMe's own app so the user can drag the downloaded file in themselves.
-// Only the account base URL is known for certain; update this once a
-// specific Assets/Import-SCORM page URL is confirmed from a real account.
-const WALKME_LEARNING_ARC_URL = "https://app.learningarc.com";
+// Deep-links straight to Assets > SCORM Packages (confirmed from a real
+// account), where "+ Learning Asset" opens the Import SCORM package
+// dialog. That dialog is pure client-side state -- the URL bar doesn't
+// change when it opens -- so this is as close as a link alone can get;
+// the one remaining step is clicking the import button themselves.
+const WALKME_LEARNING_ARC_URL = "https://app.learningarc.com/management/assets";
 
 const INPUT_FORMAT_LABELS: Record<string, string> = {
   scorm: "SCORM",
@@ -332,7 +335,7 @@ export default function AppShell() {
                           <path d="M15 3h6v6" />
                           <path d="M10 14 21 3" />
                         </svg>
-                        Open WalkMe Learning Arc
+                        Open Import SCORM in WalkMe
                       </a>
                     </div>
                   )}
