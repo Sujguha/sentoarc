@@ -3,6 +3,38 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.2] - 2026-10-06
+
+### Fixed
+
+- **A corrupted/truncated upload crashed the processing pipeline instead
+  of failing cleanly.** File-type detection only scans a zip's central
+  directory (`listZipEntries`, header-only, never inflates), so a zip
+  whose headers parse fine but whose actual compressed data is
+  truncated or corrupted passed detection undetected. The real
+  decompress attempt later threw uncaught in three places:
+  - `processPackageMessage`'s main SCORM-zip path (`fixPackage`) — the
+    primary pipeline for the product's core use case.
+  - `detect.ts`'s html-zip branch, which (unlike the rest of
+    `detectFileType`) actually inflates every entry to classify it.
+  - `expandZipOfZips`'s per-inner-zip loop (`decompressSingleEntry`) —
+    one corrupted inner package aborted extracting the rest of a bulk
+    upload.
+
+  An uncaught throw here was wrongly treated by the queue handler as a
+  transient infra failure worth Queues' built-in retry (see its own
+  comment in `src/index.ts`) — a corrupted upload would retry 3 times,
+  dead-letter, and leave the job stuck at "processing" forever with no
+  error ever shown to the user. All three now produce a clean `failed`
+  status (`CORRUPT_ZIP`) or, for the bulk case, skip just the one bad
+  inner package rather than losing the whole batch — same resilience
+  principle already applied to the non-SCORM wrap path and to metered
+  billing reporting. Reproduced and confirmed with a real corrupted zip
+  before fixing; `test/scorm/helpers.ts` gained `corruptCompressedData`
+  (flips bytes in an entry's compressed data while leaving the central
+  directory intact, so detection still succeeds) for three new
+  regression tests.
+
 ## [0.9.1] - 2026-10-06
 
 ### Fixed

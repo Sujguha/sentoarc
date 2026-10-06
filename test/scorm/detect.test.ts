@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strToU8, buildZip } from "../../src/lib/scorm/zip-utils";
 import { detectFileType } from "../../src/lib/scorm/detect";
-import { buildFixtureZip } from "./helpers";
+import { buildFixtureZip, corruptCompressedData } from "./helpers";
 
 function fakeMp4(): Uint8Array {
   // box size (4 bytes, value irrelevant for sniffing) + ASCII "ftyp" + filler
@@ -55,6 +55,24 @@ describe("detectFileType", () => {
 
   it("returns unknown for an empty ZIP", () => {
     expect(detectFileType(buildZip({})).type).toBe("unknown");
+  });
+
+  // Regression test: a zip whose central directory parses fine (so it's
+  // classified as html-zip by name alone) but whose actual compressed
+  // data is corrupted only fails once something really tries to inflate
+  // it -- that real decompress happens right here in the html-zip
+  // branch, not earlier during classification. Before this fix that
+  // throw wasn't caught, so a corrupted upload crashed the caller
+  // instead of being reported as "unknown"/unreadable.
+  it("returns unknown (not a throw) for a ZIP with corrupted compressed data", () => {
+    const corrupted = corruptCompressedData(
+      buildZip({
+        "index.html": strToU8("<!doctype html><html><body>hi</body></html>"),
+        "style.css": strToU8("body{color:red}"),
+      })
+    );
+    expect(() => detectFileType(corrupted)).not.toThrow();
+    expect(detectFileType(corrupted).type).toBe("unknown");
   });
 
   it("detects a container of multiple inner .zip packages as zip-of-zips", () => {

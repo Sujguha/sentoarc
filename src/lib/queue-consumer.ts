@@ -139,10 +139,35 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
 
   if (detection.type === "scorm-zip") {
     const tier = await resolveOwnerTier(db, message.jobId);
-    const result = fixPackage(bytes, detection.names!, {
-      // Pro/Enterprise/metered only -- see ValidatePackageOptions.
-      checkTranslationPaths: tier === "pro" || tier === "enterprise" || tier === "metered",
-    });
+    // detection only scans the central directory (never inflates -- see
+    // listZipEntries), so a zip whose headers look fine but whose actual
+    // compressed data is truncated/corrupted reaches this point
+    // undetected; fixPackage is what first tries to really decompress
+    // it, and fflate throws rather than returning a result for that.
+    // Must be caught here, not left to propagate: the queue handler
+    // treats an uncaught throw as a transient infra failure worth
+    // retrying, but a corrupted upload is permanent -- retrying it three
+    // times and dead-lettering just leaves the job stuck "processing"
+    // forever with no error ever shown to the user.
+    let result: ReturnType<typeof fixPackage>;
+    try {
+      result = fixPackage(bytes, detection.names!, {
+        // Pro/Enterprise/metered only -- see ValidatePackageOptions.
+        checkTranslationPaths: tier === "pro" || tier === "enterprise" || tier === "metered",
+      });
+    } catch {
+      const msg = "This file looked like a SCORM ZIP but couldn't be read — it may be corrupted or incomplete. Try re-exporting and uploading it again.";
+      await finishPackage(db, message, {
+        status: "failed",
+        errorMessage: msg,
+        issues: [{ severity: "error", code: "CORRUPT_ZIP", message: msg, fixApplied: false }],
+        inputFormat,
+        scormVersionIn: null,
+        scormVersionOut: null,
+        r2KeyFixed: null,
+      });
+      return;
+    }
 
     let r2KeyFixed: string | null = null;
     if (result.fixedZip) {
@@ -248,7 +273,18 @@ async function expandZipOfZips(
 
   const newPackages: { id: string; r2Key: string }[] = [];
   for (const name of innerNames) {
-    const innerBytes = decompressSingleEntry(bytes, name);
+    // decompressSingleEntry really inflates this one entry (unlike the
+    // header-only scan that produced innerNames), so a corrupted inner
+    // .zip throws here rather than returning null/empty. One bad inner
+    // package must not abort extracting the rest of a bulk upload --
+    // skip it the same way a not-found or empty entry is already
+    // skipped below.
+    let innerBytes: Uint8Array | null;
+    try {
+      innerBytes = decompressSingleEntry(bytes, name);
+    } catch {
+      continue;
+    }
     if (!innerBytes || innerBytes.length === 0) continue;
 
     const newPackageId = crypto.randomUUID();

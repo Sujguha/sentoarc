@@ -78,10 +78,19 @@ export function detectFileType(bytes: Uint8Array): DetectionResult {
     if (innerZips.length >= 2) return { type: "zip-of-zips", names: innerZips };
 
     if (hasHtmlFile(names)) {
-      // html-zip bundles are small web assets (html/css/js/images), not
-      // multi-MB video -- a full decompress here is cheap, and
-      // wrapAsHtmlZip needs every file's actual content to re-embed it.
-      return { type: "html-zip", files: safeUnzip(bytes).files };
+      // Unlike listZipEntries above, this actually inflates every entry
+      // -- a zip whose headers parsed fine (that's how we got here) can
+      // still have corrupted/truncated compressed data that only fails
+      // once something really tries to decompress it, same as the catch
+      // above but for the real inflate instead of the header scan.
+      try {
+        // html-zip bundles are small web assets (html/css/js/images), not
+        // multi-MB video -- a full decompress here is cheap, and
+        // wrapAsHtmlZip needs every file's actual content to re-embed it.
+        return { type: "html-zip", files: safeUnzip(bytes).files };
+      } catch {
+        return { type: "unknown" };
+      }
     }
     return { type: "unknown" };
   }

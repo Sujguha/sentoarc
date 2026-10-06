@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb } from "../src/lib/db/client";
 import { job, pkg, packageIssue, subscription, user } from "../src/lib/db/schema";
-import { buildZip, listZipEntries } from "../src/lib/scorm/zip-utils";
+import { buildZip, listZipEntries, strToU8 } from "../src/lib/scorm/zip-utils";
 import { processPackageMessage } from "../src/lib/queue-consumer";
-import { buildFixtureZip } from "./scorm/helpers";
+import { buildFixtureZip, corruptCompressedData } from "./scorm/helpers";
 
 async function seedJobAndPackage(
   tier: "free" | "pro" | "enterprise",
@@ -123,6 +123,65 @@ describe("processPackageMessage: zip-of-zips expansion", () => {
     }
     const [finalJob] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
     expect(finalJob?.status).toBe("completed");
+  });
+});
+
+describe("processPackageMessage: corrupted/unreadable input", () => {
+  // Regression test: file-type detection only scans a zip's central
+  // directory (never inflates -- see listZipEntries), so a zip whose
+  // headers parse fine but whose actual compressed data is
+  // truncated/corrupted reaches fixPackage undetected. Before this fix,
+  // the real decompress attempt inside fixPackage threw uncaught,
+  // which the queue handler (src/index.ts) treats as a transient
+  // infra failure worth retrying -- a corrupted upload would retry 3
+  // times, dead-letter, and leave the job stuck "processing" forever
+  // with no error ever shown to the user.
+  it("marks a corrupted SCORM zip as a clean failure instead of crashing the pipeline", async () => {
+    const corrupted = corruptCompressedData(buildFixtureZip("valid-1.2", ["index.html"]));
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", corrupted);
+    const db = createDb(env.DB);
+
+    await expect(processPackageMessage({ type: "process", jobId, packageId, r2Key }, env)).resolves.toBeUndefined();
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("failed");
+    expect(pkgRow?.errorMessage).toMatch(/corrupt/i);
+
+    const issues = await db.select().from(packageIssue).where(eq(packageIssue.packageId, packageId));
+    expect(issues.some((i) => i.code === "CORRUPT_ZIP")).toBe(true);
+
+    const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
+    expect(jobRow?.status).toBe("failed");
+  });
+
+  // Same underlying issue (decompressSingleEntry really inflates, unlike
+  // the header scan that discovered the inner .zip names), but for the
+  // bulk zip-of-zips expansion loop: one corrupted inner package must
+  // not abort extracting the rest of the upload.
+  it("skips a corrupted inner ZIP within a bulk upload without losing the other valid ones", async () => {
+    // "bad.zip" is deliberately left at the container's default deflate
+    // level (unlike the normal convention of storing inner .zips with
+    // {level: 0}, since they're already-compressed data) specifically so
+    // the container itself has real compressed data to corrupt for this
+    // entry -- that's what makes decompressSingleEntry actually inflate
+    // (and therefore actually throw) when extracting it, rather than
+    // just copying stored bytes straight through.
+    const container = buildZip({
+      "bad.zip": strToU8("not a real inner package, just something deflate-compressible".repeat(5)),
+      "good.zip": [buildFixtureZip("valid-1.2", ["index.html"]), { level: 0 }],
+    });
+    const corruptedContainer = corruptCompressedData(container);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", corruptedContainer);
+    const db = createDb(env.DB);
+
+    await expect(processPackageMessage({ type: "process", jobId, packageId, r2Key }, env)).resolves.toBeUndefined();
+
+    const packages = await db.select().from(pkg).where(eq(pkg.jobId, jobId));
+    expect(packages).toHaveLength(1);
+    expect(packages[0]?.originalFilename).toBe("good.zip");
+
+    const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
+    expect(jobRow?.totalPackages).toBe(1);
   });
 });
 
