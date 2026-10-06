@@ -2,8 +2,8 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb } from "../src/lib/db/client";
-import { job, pkg, subscription, user } from "../src/lib/db/schema";
-import { buildZip } from "../src/lib/scorm/zip-utils";
+import { job, pkg, packageIssue, subscription, user } from "../src/lib/db/schema";
+import { buildZip, listZipEntries } from "../src/lib/scorm/zip-utils";
 import { processPackageMessage } from "../src/lib/queue-consumer";
 import { buildFixtureZip } from "./scorm/helpers";
 
@@ -123,5 +123,70 @@ describe("processPackageMessage: zip-of-zips expansion", () => {
     }
     const [finalJob] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
     expect(finalJob?.status).toBe("completed");
+  });
+});
+
+describe("processPackageMessage: streamed 'fixed' output reaches R2 intact", () => {
+  // Regression test: buildFixedZipStream's output is a plain
+  // ReadableStream with no declared length. R2's single-shot put()
+  // rejects that outright ("must have a known length"), which would
+  // silently break every package that actually needs a manifest fix
+  // (the "pass" case is unaffected -- it reuses the original Uint8Array
+  // verbatim, never touching this code path). This isn't specific to
+  // the translation-path rule; any fix (e.g. scormtype correction)
+  // takes the same streamed-upload path.
+  it("stores a scormtype-fix package (unrelated to translation paths) correctly in R2", async () => {
+    const bytes = buildFixtureZip("asset-scormtype", ["index.html"]);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", bytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+    expect(pkgRow?.r2KeyFixed).toBeTruthy();
+
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    expect(fixedObject).not.toBeNull();
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames.sort()).toEqual(["imsmanifest.xml", "index.html"].sort());
+  });
+});
+
+describe("processPackageMessage: translation-path rewrite gating", () => {
+  it("does not apply the translation-path fix for a free-tier owner", async () => {
+    const bytes = buildFixtureZip("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", bytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("pass"); // no fix applied -> nothing to rebuild
+  });
+
+  it("applies the translation-path fix for a pro-tier owner", async () => {
+    const bytes = buildFixtureZip("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", bytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+
+    const issues = await db.select().from(packageIssue).where(eq(packageIssue.packageId, packageId));
+    const issue = issues.find((i) => i.code === "TRANSLATION_PATH_MISMATCH");
+    expect(issue?.fixApplied).toBe(true);
+
+    // Round-trips correctly through R2 (exercises the multipart-upload
+    // path for a streamed fixedZip, not just the DB status flip).
+    expect(pkgRow?.r2KeyFixed).toBeTruthy();
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    expect(fixedObject).not.toBeNull();
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames.sort()).toEqual(["en-us/narration.mp3", "imsmanifest.xml", "index.html"].sort());
   });
 });

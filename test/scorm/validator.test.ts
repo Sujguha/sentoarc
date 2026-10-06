@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { buildZip, listZipEntries } from "../../src/lib/scorm/zip-utils";
-import { validatePackage, hasErrors } from "../../src/lib/scorm/validator";
+import { validatePackage, hasErrors, type ValidatePackageOptions } from "../../src/lib/scorm/validator";
 import { buildFixtureZip } from "./helpers";
 
-function validateFixture(name: Parameters<typeof buildFixtureZip>[0], files: string[]) {
+function validateFixture(
+  name: Parameters<typeof buildFixtureZip>[0],
+  files: string[],
+  options: ValidatePackageOptions = {}
+) {
   const data = buildFixtureZip(name, files);
   const names = listZipEntries(data).entries.map((e) => e.name);
-  return validatePackage(data, names);
+  return validatePackage(data, names, options);
 }
 
 describe("validatePackage", () => {
@@ -47,5 +51,37 @@ describe("validatePackage", () => {
     const data = buildZip({});
     const result = validatePackage(data, listZipEntries(data).entries.map((e) => e.name));
     expect(result.issues[0]!.code).toBe("MANIFEST_MISSING");
+  });
+
+  describe("translation path checks (checkTranslationPaths: true)", () => {
+    it("ignores translated-asset paths when the option is off (default)", () => {
+      const result = validateFixture("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
+      expect(result.issues.map((i) => i.code)).not.toContain("TRANSLATION_PATH_MISMATCH");
+    });
+
+    it("flags a case-mismatched translated asset as fixable", () => {
+      const result = validateFixture(
+        "translation-path-mismatch",
+        ["index.html", "en-us/narration.mp3"],
+        { checkTranslationPaths: true }
+      );
+      expect(hasErrors(result.issues)).toBe(false);
+      expect(result.issues.map((i) => i.code)).toContain("TRANSLATION_PATH_MISMATCH");
+    });
+
+    it("does not flag a translated asset whose path matches exactly", () => {
+      const result = validateFixture(
+        "translation-path-mismatch",
+        ["index.html", "en-US/narration.mp3"],
+        { checkTranslationPaths: true }
+      );
+      expect(result.issues.map((i) => i.code)).not.toContain("TRANSLATION_PATH_MISMATCH");
+    });
+
+    it("reports an unfixable error when a translated asset is entirely missing", () => {
+      const result = validateFixture("translation-asset-missing", ["index.html"], { checkTranslationPaths: true });
+      expect(hasErrors(result.issues)).toBe(true);
+      expect(result.issues.map((i) => i.code)).toContain("TRANSLATION_ASSET_MISSING");
+    });
   });
 });

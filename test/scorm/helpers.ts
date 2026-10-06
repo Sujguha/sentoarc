@@ -6,6 +6,8 @@ import scorm2004 from "../fixtures/manifests/scorm-2004.xml?raw";
 import assetScormtype from "../fixtures/manifests/asset-scormtype.xml?raw";
 import missingLaunchFile from "../fixtures/manifests/missing-launch-file.xml?raw";
 import nestedFolders from "../fixtures/manifests/nested-folders.xml?raw";
+import translationPathMismatch from "../fixtures/manifests/translation-path-mismatch.xml?raw";
+import translationAssetMissing from "../fixtures/manifests/translation-asset-missing.xml?raw";
 
 export const FIXTURE_MANIFESTS = {
   "valid-1.2": valid12,
@@ -13,6 +15,8 @@ export const FIXTURE_MANIFESTS = {
   "asset-scormtype": assetScormtype,
   "missing-launch-file": missingLaunchFile,
   "nested-folders": nestedFolders,
+  "translation-path-mismatch": translationPathMismatch,
+  "translation-asset-missing": translationAssetMissing,
 } as const;
 
 export type FixtureName = keyof typeof FIXTURE_MANIFESTS;

@@ -27,10 +27,30 @@ export function hasErrors(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.severity === "error");
 }
 
+// Matches a locale folder as a full path segment -- "en-US", "de_DE",
+// "zh-Hans", etc. -- so a translated-asset reference under it can be
+// told apart from an ordinary file path that merely contains two
+// consecutive letters. Requires a trailing slash (it names a directory,
+// with content beneath it), not just an incidental substring match.
+const LOCALE_PATH_SEGMENT = /(^|\/)[a-zA-Z]{2}[-_][A-Za-z]{2,4}\//;
+
+export interface ValidatePackageOptions {
+  // Pro/Enterprise-only: checks every <file> a resource declares (not
+  // just its launch href, which LAUNCH_FILE_MISSING/CASE_MISMATCH
+  // already cover for every tier) for translated/localized assets whose
+  // path doesn't match what's actually in the package. Off by default
+  // so Free-tier results are unchanged.
+  checkTranslationPaths?: boolean;
+}
+
 // originalData is the whole uploaded (still-compressed) ZIP; names is the
 // entry listing from listZipEntries. Only the manifest entry is ever
 // decompressed here -- every other name is just checked for existence.
-export function validatePackage(originalData: Uint8Array, names: string[]): ValidationResult {
+export function validatePackage(
+  originalData: Uint8Array,
+  names: string[],
+  options: ValidatePackageOptions = {}
+): ValidationResult {
   const issues: ValidationIssue[] = [];
 
   const manifestPath = findNameCaseInsensitive(names, "imsmanifest.xml");
@@ -146,6 +166,30 @@ export function validatePackage(originalData: Uint8Array, names: string[]): Vali
         code: "LAUNCH_FILE_CASE_MISMATCH",
         message: `Resource "${res.identifier}" references "${res.href}" but the file in the package is "${found}" (case mismatch). Will be corrected.`,
       });
+    }
+  }
+
+  if (options.checkTranslationPaths) {
+    for (const res of manifest.resources) {
+      for (const fileHref of res.files) {
+        if (!LOCALE_PATH_SEGMENT.test(fileHref)) continue; // not a localized asset path
+        if (names.includes(fileHref)) continue; // exact match, nothing to fix
+
+        const found = findNameCaseInsensitive(names, fileHref);
+        if (!found) {
+          issues.push({
+            severity: "error",
+            code: "TRANSLATION_ASSET_MISSING",
+            message: `Resource "${res.identifier}" references translated asset "${fileHref}" which was not found in the package.`,
+          });
+        } else {
+          issues.push({
+            severity: "warning",
+            code: "TRANSLATION_PATH_MISMATCH",
+            message: `Resource "${res.identifier}" references translated asset "${fileHref}" but the file in the package is "${found}" (path/case mismatch). Will be corrected.`,
+          });
+        }
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import { findNameCaseInsensitive, strToU8, buildFixedZipStream } from "./zip-utils";
 import { serializeManifest } from "./manifest-parser";
-import { validatePackage, TITLE_MAX_LENGTH, type ValidationIssue } from "./validator";
+import { validatePackage, TITLE_MAX_LENGTH, type ValidationIssue, type ValidatePackageOptions } from "./validator";
 
 export interface PackageIssue extends ValidationIssue {
   fixApplied: boolean;
@@ -37,8 +37,10 @@ function hasErrorSeverity(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.severity === "error");
 }
 
-export function fixPackage(originalData: Uint8Array, names: string[]): FixResult {
-  const validation = validatePackage(originalData, names);
+export type FixPackageOptions = ValidatePackageOptions;
+
+export function fixPackage(originalData: Uint8Array, names: string[], options: FixPackageOptions = {}): FixResult {
+  const validation = validatePackage(originalData, names, options);
   const { manifest, manifestPath, issues: baseIssues, directlyReferencedResourceIds } = validation;
 
   const packageIsBroken = manifest === null || hasErrorSeverity(baseIssues);
@@ -96,6 +98,25 @@ export function fixPackage(originalData: Uint8Array, names: string[]): FixResult
             resource["@_href"] = corrected;
             for (const f of resource.file ?? []) {
               if (typeof f["@_href"] === "string" && f["@_href"].toLowerCase() === originalHref.toLowerCase()) {
+                f["@_href"] = corrected;
+              }
+            }
+            fixApplied = true;
+          }
+        }
+        break;
+      }
+
+      case "TRANSLATION_PATH_MISMATCH": {
+        const match = issue.message.match(/Resource "([^"]+)" references translated asset "([^"]+)"/);
+        const resourceId = match?.[1];
+        const originalHref = match?.[2];
+        const resource = getResourcesArray(raw).find((r: any) => r["@_identifier"] === resourceId);
+        if (resource && originalHref) {
+          const corrected = findNameCaseInsensitive(names, originalHref);
+          if (corrected) {
+            for (const f of resource.file ?? []) {
+              if (f["@_href"] === originalHref) {
                 f["@_href"] = corrected;
               }
             }

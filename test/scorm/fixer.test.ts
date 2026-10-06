@@ -87,6 +87,37 @@ describe("fixPackage", () => {
     );
   });
 
+  it("translation-path-mismatch: ignored by default (no checkTranslationPaths option)", () => {
+    const data = buildFixtureZip("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
+    const result = fixPackage(data, namesOf(data));
+    expect(result.status).toBe("pass");
+    expect(result.issues.map((i) => i.code)).not.toContain("TRANSLATION_PATH_MISMATCH");
+  });
+
+  it("translation-path-mismatch: with checkTranslationPaths, rewrites the locale-path casing", async () => {
+    const data = buildFixtureZip("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
+    const result = fixPackage(data, namesOf(data), { checkTranslationPaths: true });
+    expect(result.status).toBe("fixed");
+
+    const issue = result.issues.find((i) => i.code === "TRANSLATION_PATH_MISMATCH");
+    expect(issue?.fixApplied).toBe(true);
+
+    const fixedBytes = await toUint8Array(result.fixedZip);
+    const fixedFiles = safeUnzip(fixedBytes).files;
+    const rewritten = parseManifest(new TextDecoder().decode(fixedFiles["imsmanifest.xml"]));
+    expect(rewritten.resources[0]!.files).toContain("en-us/narration.mp3");
+    expect(rewritten.resources[0]!.files).not.toContain("en-US/narration.mp3");
+  });
+
+  it("translation-asset-missing: with checkTranslationPaths, status failed (unfixable)", () => {
+    const data = buildFixtureZip("translation-asset-missing", ["index.html"]);
+    const result = fixPackage(data, namesOf(data), { checkTranslationPaths: true });
+    expect(result.status).toBe("failed");
+    expect(result.fixedZip).toBeNull();
+    const issue = result.issues.find((i) => i.code === "TRANSLATION_ASSET_MISSING");
+    expect(issue?.fixApplied).toBe(false);
+  });
+
   it("SCORM 2004 WITHOUT sequencing: converted to 1.2, status fixed", async () => {
     const manifestXml = `<?xml version="1.0" standalone="no" ?>
 <manifest identifier="COM.SCORM.2004.NOSEQ"

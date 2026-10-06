@@ -24,6 +24,68 @@ function deriveFixedKey(uploadKey: string): string {
   return uploadKey.replace(/\/[^/]+$/, "/fixed.zip");
 }
 
+// R2's single-shot put() needs a value of known length for a stream
+// body (workerd rejects a plain hand-rolled ReadableStream like
+// buildFixedZipStream's output with "must have a known length") --
+// multipart upload is the actual supported path for streaming data
+// whose total size isn't known ahead of time. Buffers into >= 5MiB
+// parts (R2's multipart minimum for every part but the last) so memory
+// stays bounded regardless of how large the rebuilt package is.
+const MULTIPART_PART_SIZE = 5 * 1024 * 1024;
+
+async function putFixedZip(bucket: R2Bucket, key: string, data: Uint8Array | ReadableStream<Uint8Array>): Promise<void> {
+  if (data instanceof Uint8Array) {
+    await bucket.put(key, data);
+    return;
+  }
+
+  const upload = await bucket.createMultipartUpload(key);
+  const parts: R2UploadedPart[] = [];
+
+  async function uploadBuffered(chunks: Uint8Array[], size: number): Promise<void> {
+    const combined = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    parts.push(await upload.uploadPart(parts.length + 1, combined));
+  }
+
+  try {
+    const reader = data.getReader();
+    let buffer: Uint8Array[] = [];
+    let bufferedBytes = 0;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value && value.length > 0) {
+        buffer.push(value);
+        bufferedBytes += value.length;
+      }
+      if (!done && bufferedBytes >= MULTIPART_PART_SIZE) {
+        await uploadBuffered(buffer, bufferedBytes);
+        buffer = [];
+        bufferedBytes = 0;
+      }
+      if (done) {
+        // Flush whatever's left as the final part -- always, even if
+        // empty, when no part has been uploaded yet (complete() needs
+        // at least one part).
+        if (bufferedBytes > 0 || parts.length === 0) {
+          await uploadBuffered(buffer, bufferedBytes);
+        }
+        break;
+      }
+    }
+
+    await upload.complete(parts);
+  } catch (err) {
+    await upload.abort().catch(() => {});
+    throw err;
+  }
+}
+
 export async function processPackageMessage(message: ProcessingQueueMessage, env: Env): Promise<void> {
   const db = createDb(env.DB);
   const now = () => new Date();
@@ -76,12 +138,16 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   const inputFormat = INPUT_FORMAT_BY_DETECTED_TYPE[detection.type];
 
   if (detection.type === "scorm-zip") {
-    const result = fixPackage(bytes, detection.names!);
+    const tier = await resolveOwnerTier(db, message.jobId);
+    const result = fixPackage(bytes, detection.names!, {
+      // Pro/Enterprise only -- see ValidatePackageOptions.
+      checkTranslationPaths: tier === "pro" || tier === "enterprise",
+    });
 
     let r2KeyFixed: string | null = null;
     if (result.fixedZip) {
       r2KeyFixed = deriveFixedKey(message.r2Key);
-      await env.PACKAGES_BUCKET.put(r2KeyFixed, result.fixedZip);
+      await putFixedZip(env.PACKAGES_BUCKET, r2KeyFixed, result.fixedZip);
     }
 
     await finishPackage(db, message, {
@@ -136,6 +202,15 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   });
 }
 
+async function resolveOwnerTier(db: Db, jobId: string): Promise<"free" | "pro" | "enterprise"> {
+  const [jobRow] = await db
+    .select({ ownerType: job.ownerType, ownerId: job.ownerId })
+    .from(job)
+    .where(eq(job.id, jobId))
+    .limit(1);
+  return jobRow ? await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId) : "free";
+}
+
 // A "bulk" upload: the container itself isn't a package, its entries are.
 // Pro/Enterprise only -- Free stays "single packages only" per the
 // pricing page. Each inner .zip is extracted (not re-compressed; its
@@ -150,13 +225,7 @@ async function expandZipOfZips(
   bytes: Uint8Array,
   innerNames: string[]
 ): Promise<void> {
-  const [jobRow] = await db
-    .select({ ownerType: job.ownerType, ownerId: job.ownerId })
-    .from(job)
-    .where(eq(job.id, message.jobId))
-    .limit(1);
-
-  const tier = jobRow ? await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId) : "free";
+  const tier = await resolveOwnerTier(db, message.jobId);
 
   if (tier === "free") {
     const msg =

@@ -3,6 +3,46 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-10-06
+
+### Fixed
+
+- **Critical**: every package that actually needed a manifest fix (not
+  the "pass"-through case) has likely been failing silently in
+  production since 0.3.2. `buildFixedZipStream` produces a plain
+  `ReadableStream` with no declared length; R2's single-shot `put()`
+  rejects that outright ("must have a known length") -- workerd is the
+  same engine locally and in production, so this wasn't a test-only
+  quirk. "pass" packages were unaffected (they reuse the original
+  bytes verbatim, a `Uint8Array`, never touching this code path),
+  which is why the 0.3.2 perf-test verification didn't catch it: those
+  fixtures apparently didn't need an actual rewrite. Found while adding
+  a test that exercises the translation-path fix end-to-end through R2
+  (below) -- the first test to do that for *any* fix rule.
+  `queue-consumer.ts` now uploads a streamed `fixedZip` via R2
+  multipart upload instead (buffered into >= 5MiB parts, so memory
+  stays bounded regardless of package size); a plain `Uint8Array`
+  still goes through `put()` directly. New regression test
+  (`test/queue-consumer.test.ts`) uploads a fixed package through the
+  real pipeline and reads it back from R2 to confirm it round-trips.
+
+### Added
+
+- Translation-path rewrite (Pro/Enterprise only), the last gap the
+  pricing-page audit found with zero backing code. `validator.ts`
+  gains an opt-in check (`checkTranslationPaths`, off by default so
+  Free-tier results are unchanged): every `<file>` a resource declares
+  under a locale folder (`en-US/`, `de_DE/`, etc.) -- not just the
+  launch href, which was already covered for every tier -- is checked
+  against the package's actual contents. A path/case mismatch is
+  fixed (rewritten to the real path); a translated asset that's
+  entirely missing is reported as an unfixable error, same convention
+  as a missing launch file. `fixer.ts`/`queue-consumer.ts` thread the
+  option through, resolving the job owner's tier the same way the
+  ZIP-of-ZIPs bulk-upload gate does. New fixtures
+  (`translation-path-mismatch.xml`, `translation-asset-missing.xml`)
+  and tests at the validator, fixer, and queue-consumer levels.
+
 ## [0.5.1] - 2026-10-06
 
 ### Added

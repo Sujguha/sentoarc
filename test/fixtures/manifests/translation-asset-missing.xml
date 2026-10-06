@@ -1,0 +1,24 @@
+<?xml version="1.0" standalone="no" ?>
+<manifest identifier="COM.SCORM.CONTENTPACKAGING.TRANSLATION.MISSING.12"
+          version="1"
+          xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+          xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+  <organizations default="ORG-1">
+    <organization identifier="ORG-1">
+      <title>Localized Course</title>
+      <item identifier="ITEM-1" identifierref="RES-1">
+        <title>Lesson 1</title>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="RES-1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+      <file href="index.html"/>
+      <file href="de-DE/missing.mp3"/>
+    </resource>
+  </resources>
+</manifest>
