@@ -94,7 +94,7 @@ export default function AppShell() {
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
   const [tier, setTier] = useState<"free" | "pro" | "enterprise">("free");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const canBulkUpload = tier === "pro" || tier === "enterprise";
+  const isProOrEnterprise = tier === "pro" || tier === "enterprise";
 
   useEffect(() => {
     fetch("/api/usage")
@@ -234,7 +234,7 @@ export default function AppShell() {
             id="file-input"
             type="file"
             accept={ALLOWED_EXTENSIONS.join(",")}
-            multiple={canBulkUpload}
+            multiple={isProOrEnterprise}
             className="hidden"
             onChange={handleFileChange}
             disabled={uploading}
@@ -243,11 +243,11 @@ export default function AppShell() {
             htmlFor="file-input"
             className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
           >
-            {uploading ? "Uploading…" : canBulkUpload ? "Choose file(s)" : "Choose a file"}
+            {uploading ? "Uploading…" : isProOrEnterprise ? "Choose file(s)" : "Choose a file"}
           </label>
           <p className="mt-2 text-xs text-slate-400">
             SCORM ZIP, PDF, MP4, PPTX, or HTML
-            {canBulkUpload
+            {isProOrEnterprise
               ? " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch."
               : ". Upgrade to Pro to upload multiple packages at once."}
           </p>
@@ -261,7 +261,17 @@ export default function AppShell() {
 
         {jobDetail && (
           <div className="mt-8">
-            <h2 className="text-lg font-semibold text-slate-900">Migration report</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Migration report</h2>
+              {isProOrEnterprise && (
+                <a
+                  href={`/api/jobs/${jobDetail.job.id}/export.csv`}
+                  className="text-sm font-medium text-indigo-700 hover:underline"
+                >
+                  Export CSV
+                </a>
+              )}
+            </div>
             <div className="mt-3 space-y-4">
               {jobDetail.packages.map((p) => (
                 <div key={p.id} className="rounded-lg border border-slate-200 p-4">

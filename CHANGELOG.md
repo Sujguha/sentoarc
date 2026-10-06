@@ -3,6 +3,19 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] - 2026-10-06
+
+### Added
+
+- CSV report export (Pro/Enterprise only), closing another gap the
+  pricing-page audit found: "CSV report export" had zero backing code
+  before this. `GET /api/jobs/:id/export.csv`, gated by the same
+  `requirePlan(["pro","enterprise"])` bulk upload now uses. One row per
+  package: filename, status, input/output format, size, error message,
+  and a `|`-joined summary of its issues. `/app` shows an "Export CSV"
+  link next to the report for Pro/Enterprise accounts. New tests cover
+  the CSV field/row escaping (commas, quotes, newlines).
+
 ## [0.5.0] - 2026-10-06
 
 ### Added
