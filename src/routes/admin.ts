@@ -48,3 +48,50 @@ adminRoute.put("/subscriptions/:ownerType/:ownerId/retention", requireAuth, requ
 
   return c.json({ ok: true, retentionDays });
 });
+
+// Sets (creating the row if none exists yet) an owner's plan tier. This
+// is the only way an org's subscription row ever comes into being --
+// Stripe checkout (billing.ts) only ever creates a "user"-owned one, so
+// an org provisioned via the founder-only organization-creation gate
+// (see allowUserToCreateOrganization in auth/index.ts) would otherwise
+// be stuck on the implicit "free" fallback (resolvePlanTierFor) forever.
+// The founder calls this after a sales conversation, same spirit as the
+// retention override above; also handy for comping a Pro/metered plan.
+adminRoute.put("/subscriptions/:ownerType/:ownerId/tier", requireAuth, requireAdmin, async (c) => {
+  const ownerType = c.req.param("ownerType");
+  const ownerId = c.req.param("ownerId");
+  if (ownerType !== "user" && ownerType !== "org") {
+    return c.json({ error: "invalid_owner_type" }, 400);
+  }
+
+  const body = await c.req.json<{ tier?: string }>().catch(() => null);
+  const tier = body?.tier;
+  if (tier !== "free" && tier !== "pro" && tier !== "enterprise" && tier !== "metered") {
+    return c.json({ error: "invalid_tier", allowed: ["free", "pro", "enterprise", "metered"] }, 400);
+  }
+
+  const db = createDb(c.env.DB);
+  const now = new Date();
+  const [existing] = await db
+    .select({ id: subscription.id })
+    .from(subscription)
+    .where(and(eq(subscription.ownerType, ownerType), eq(subscription.ownerId, ownerId)))
+    .limit(1);
+
+  if (existing) {
+    await db.update(subscription).set({ tier, status: "active", updatedAt: now }).where(eq(subscription.id, existing.id));
+  } else {
+    await db.insert(subscription).values({
+      id: crypto.randomUUID(),
+      ownerType,
+      ownerId,
+      tier,
+      status: "active",
+      seats: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  return c.json({ ok: true, tier });
+});

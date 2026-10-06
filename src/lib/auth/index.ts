@@ -5,6 +5,7 @@ import { createDb } from "../db/client";
 import { sendEmail } from "../email/sendgrid";
 import { logAudit } from "../audit";
 import { orgAccessControl, orgRoles } from "../org-access-control";
+import { isFounderEmail } from "../founder-access";
 import type { Env } from "../../types/env";
 
 export function createAuth(env: Env) {
@@ -63,6 +64,15 @@ export function createAuth(env: Env) {
         disableOrganizationDeletion: true,
         ac: orgAccessControl,
         roles: orgRoles,
+        // Enterprise ("multiple users with roles") is sales-assisted on
+        // the pricing page, not self-serve -- without this, better-auth's
+        // default (allowUserToCreateOrganization: true) lets any signed-in
+        // user, on any tier, create an org and get the full roles/invite/
+        // audit-log experience for free. Only org *creation* is gated
+        // here; a customer who's already a member of an org the founder
+        // provisioned can still manage it day to day (invite teammates,
+        // change roles) through the rest of this same plugin.
+        allowUserToCreateOrganization: (user) => isFounderEmail(env, user.email),
         sendInvitationEmail: async (data) => {
           const url = `${env.APP_BASE_URL}/accept-invitation?id=${data.invitation.id}`;
           await sendEmail(env.SENDGRID_API_KEY, {

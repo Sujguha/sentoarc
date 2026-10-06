@@ -3,6 +3,36 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.1] - 2026-10-06
+
+### Fixed
+
+- **Organization creation was never actually gated to Enterprise.** The
+  `/organization` page and better-auth's `organization` plugin had no
+  tier/subscription check at all — any signed-in user, on any plan,
+  could create an org and get the full roles/invite/audit-log
+  experience for free, even though the pricing page markets this as
+  "Enterprise — Contact us" (sales-assisted). The original Enterprise
+  build gated what happens *inside* an org correctly (uploads under a
+  free-tier org still hit Free limits) but never gated the *entrance*.
+  - `allowUserToCreateOrganization` (a first-class better-auth option)
+    now restricts org creation to the founder's own allowlisted email —
+    the same `ADMIN_EMAILS` check `requireAdmin` already used, now
+    shared from one place (`src/lib/founder-access.ts`) instead of two
+    copies that could drift. A customer who's already a member of an
+    org the founder provisioned can still manage it day to day (invite
+    teammates, change roles) — only the initial create is restricted.
+  - New `PUT /api/admin/subscriptions/:ownerType/:ownerId/tier`
+    (founder-only): there was previously no path for an org's
+    subscription row to ever be created at all — Stripe checkout only
+    ever creates a "user"-owned one — so a founder-provisioned org would
+    have been stuck on the implicit "free" fallback forever. This is
+    how the founder puts a new org on Enterprise after a sales
+    conversation.
+  - `/organization` now shows "Contact sales" instead of the create-org
+    form for everyone except the founder (probed via the existing
+    `/api/admin/ping`, no new endpoint needed just for this).
+
 ## [0.9.0] - 2026-10-06
 
 ### Added

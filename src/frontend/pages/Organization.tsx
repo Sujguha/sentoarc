@@ -46,6 +46,12 @@ export default function Organization() {
   const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("editor");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Enterprise (creating a new org) is sales-assisted, not self-serve --
+  // only the founder can actually create one (see
+  // allowUserToCreateOrganization in auth/index.ts). /api/admin/ping is
+  // an existing founder-only probe we reuse here rather than adding a
+  // new endpoint just to expose this one boolean.
+  const [isFounder, setIsFounder] = useState(false);
 
   const loadOrgs = useCallback(async () => {
     const { data } = await authClient.organization.list();
@@ -77,6 +83,9 @@ export default function Organization() {
   useEffect(() => {
     loadOrgs();
     loadActive();
+    fetch("/api/admin/ping")
+      .then((res) => setIsFounder(res.ok))
+      .catch(() => setIsFounder(false));
   }, [loadOrgs, loadActive]);
 
   useEffect(() => {
@@ -208,21 +217,33 @@ export default function Organization() {
             </button>
           )}
 
-          <form onSubmit={createOrg} className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
-            <input
-              value={newOrgName}
-              onChange={(e) => setNewOrgName(e.target.value)}
-              placeholder="New organization name"
-              className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={busy || !newOrgName.trim()}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            >
-              Create
-            </button>
-          </form>
+          {isFounder ? (
+            <form onSubmit={createOrg} className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+              <input
+                value={newOrgName}
+                onChange={(e) => setNewOrgName(e.target.value)}
+                placeholder="New organization name"
+                className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={busy || !newOrgName.trim()}
+                className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                Create
+              </button>
+            </form>
+          ) : (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-sm text-slate-600">
+                Organizations are part of the Enterprise plan, set up with our team rather than self-serve.{" "}
+                <a href="/#contact" className="font-medium text-indigo-700">
+                  Contact sales
+                </a>{" "}
+                to get a workspace set up for your team.
+              </p>
+            </div>
+          )}
         </div>
 
         {activeOrg && (
