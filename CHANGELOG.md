@@ -3,6 +3,42 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-10-06
+
+### Added
+
+- Phase 3: Stripe Checkout, Billing Portal, and webhook-driven Pro
+  subscriptions. `requirePlan`/`resolvePlanTier` needed no changes --
+  they already read tier from the `subscription` table, so wiring
+  Stripe in was purely additive.
+  - `POST /api/billing/checkout`: creates a Stripe Checkout session for
+    the Pro price (monthly or yearly), reusing the user's existing
+    Stripe customer if they have one. Seats fixed at 1 -- multi-seat
+    stays the Enterprise contact-sales flow, not self-serve.
+  - `POST /api/billing/portal`: Stripe Billing Portal session so Pro
+    customers manage/cancel their own subscription.
+  - `POST /api/billing/webhook`: verifies the Stripe signature (Workers
+    needs the async + SubtleCrypto verification path, not Node's
+    crypto) and is the *only* thing that ever writes to the
+    `subscription` table -- plan tier is never taken from a client.
+    Syncs `checkout.session.completed` / `customer.subscription.updated`
+    / `customer.subscription.deleted`.
+  - Account page: Upgrade to Pro (monthly/yearly) for Free users,
+    Manage billing for Pro users.
+  - Test infra: vitest-pool-workers' D1 instance had no schema applied,
+    so any test touching `env.DB` would have failed outright --
+    wired up `applyD1Migrations` against the real migration files (the
+    same ones `deploy.yml` applies). 6 new tests cover webhook signature
+    verification and the subscription-row sync.
+  - Provisioned via a one-off workflow
+    (`.github/workflows/provision-stripe.yml`): created the Pro Product
+    and two Prices in a Stripe Sandbox, registered the webhook endpoint,
+    and pushed `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` to Cloudflare
+    as Worker secrets.
+  - Pricing is a placeholder (€29/month, €290/year) pending a real
+    decision -- trivial to change later in the Stripe dashboard, no
+    code change needed.
+
 ## [0.3.2] - 2026-10-05
 
 ### Fixed
