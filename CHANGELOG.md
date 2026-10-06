@@ -38,6 +38,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Pricing is a placeholder (€29/month, €290/year) pending a real
     decision -- trivial to change later in the Stripe dashboard, no
     code change needed.
+  - Verified live (`.github/workflows/e2e-billing-test.yml`): Checkout
+    returns a real `checkout.stripe.com` session URL (`cs_test_...`,
+    confirming Sandbox/test mode, not live), the Portal route correctly
+    refuses a user with no Stripe customer yet (`400
+    no_stripe_customer`), and the webhook route is live and rejects
+    unsigned requests (`400 missing_signature`).
 
 ## [0.3.2] - 2026-10-05
 
