@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import { useSession } from "../lib/auth-client";
+import { PasswordInput } from "../components/PasswordInput";
+import { authClient, useSession } from "../lib/auth-client";
 
 interface Usage {
   tier: string;
@@ -20,6 +22,13 @@ export default function Account() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [billingBusy, setBillingBusy] = useState<"month" | "year" | "portal" | number | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/usage")
@@ -76,6 +85,35 @@ export default function Account() {
     }
   }
 
+  async function handleChangePassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords don't match.");
+      return;
+    }
+    setPasswordBusy(true);
+    const { error } = await authClient.changePassword({
+      currentPassword,
+      newPassword,
+      revokeOtherSessions: true,
+    });
+    setPasswordBusy(false);
+    if (error) {
+      setPasswordError(error.message ?? "Couldn't update password — please try again.");
+      return;
+    }
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordSuccess("Password updated.");
+  }
+
   async function openBillingPortal() {
     setBillingBusy("portal");
     setBillingError(null);
@@ -109,76 +147,132 @@ export default function Account() {
           <p className="mt-4 rounded-md bg-slate-50 px-4 py-2 text-sm text-slate-600">Checkout cancelled.</p>
         )}
 
-        {usage && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-5">
-            <p className="font-medium text-slate-900">
-              Plan: <span className="capitalize">{usage.tier}</span>
-            </p>
-            {usage.tier === "free" && (
-              <p className="mt-1 text-sm text-slate-600">
-                {usage.freeUploadsUsed} / {usage.freeUploadLimit} free uploads used
-              </p>
-            )}
-            {usage.tier === "metered" && usage.balanceCents !== null && (
-              <p className="mt-1 text-sm text-slate-600">
-                Balance: <span className="font-medium text-slate-900">€{(usage.balanceCents / 100).toFixed(2)}</span>
-                {usage.meteredMbBilledLifetime !== null && ` · ${usage.meteredMbBilledLifetime} MB processed lifetime`}
-                {" — prepaid, deducted per upload, no subscription"}
-              </p>
-            )}
-
-            {usage.tier === "free" && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  onClick={() => startCheckout("month")}
-                  disabled={billingBusy !== null}
-                  className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-                >
-                  {billingBusy === "month" ? "Redirecting…" : "Upgrade to Pro (monthly)"}
-                </button>
-                <button
-                  onClick={() => startCheckout("year")}
-                  disabled={billingBusy !== null}
-                  className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
-                >
-                  {billingBusy === "year" ? "Redirecting…" : "Upgrade to Pro (yearly)"}
-                </button>
-              </div>
-            )}
-
-            {(usage.tier === "free" || usage.tier === "metered") && (
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="text-sm text-slate-600">
-                  {usage.tier === "free" ? "Or pay as you go — top up a balance, no subscription:" : "Top up your balance:"}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {TOPUP_PRESETS_CENTS.map((cents) => (
-                    <button
-                      key={cents}
-                      onClick={() => startTopup(cents)}
-                      disabled={billingBusy !== null}
-                      className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
-                    >
-                      {billingBusy === cents ? "Redirecting…" : `+€${(cents / 100).toFixed(0)}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {usage.tier !== "free" && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-slate-900">Account settings</h2>
+          <div className="mt-3 rounded-lg border border-slate-200 p-5">
+            <p className="font-medium text-slate-900">Change password</p>
+            <form onSubmit={handleChangePassword} className="mt-3 max-w-sm space-y-3">
+              <PasswordInput
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                placeholder="Current password"
+              />
+              <PasswordInput
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="New password"
+              />
+              <PasswordInput
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="Confirm new password"
+              />
               <button
-                onClick={openBillingPortal}
-                disabled={billingBusy !== null}
-                className="mt-4 rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                type="submit"
+                disabled={passwordBusy}
+                className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
               >
-                {billingBusy === "portal" ? "Redirecting…" : "Manage billing"}
+                {passwordBusy ? "Updating…" : "Update password"}
               </button>
-            )}
-
-            {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}
+              {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
+              {passwordSuccess && <p className="text-sm text-green-700">{passwordSuccess}</p>}
+            </form>
           </div>
-        )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-slate-900">Plans & Pricing</h2>
+          {usage && (
+            <div className="mt-3 rounded-lg border border-slate-200 p-5">
+              <p className="font-medium text-slate-900">
+                Plan: <span className="capitalize">{usage.tier}</span>
+              </p>
+              {usage.tier === "free" && (
+                <p className="mt-1 text-sm text-slate-600">
+                  {usage.freeUploadsUsed} / {usage.freeUploadLimit} free uploads used
+                </p>
+              )}
+              {usage.tier === "metered" && usage.balanceCents !== null && (
+                <p className="mt-1 text-sm text-slate-600">
+                  Balance: <span className="font-medium text-slate-900">€{(usage.balanceCents / 100).toFixed(2)}</span>
+                  {usage.meteredMbBilledLifetime !== null && ` · ${usage.meteredMbBilledLifetime} MB processed lifetime`}
+                  {" — prepaid, deducted per upload, no subscription"}
+                </p>
+              )}
+
+              {usage.tier === "free" && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => startCheckout("month")}
+                    disabled={billingBusy !== null}
+                    className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+                  >
+                    {billingBusy === "month" ? "Redirecting…" : "Upgrade to Pro (monthly)"}
+                  </button>
+                  <button
+                    onClick={() => startCheckout("year")}
+                    disabled={billingBusy !== null}
+                    className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                  >
+                    {billingBusy === "year" ? "Redirecting…" : "Upgrade to Pro (yearly)"}
+                  </button>
+                </div>
+              )}
+
+              {(usage.tier === "free" || usage.tier === "metered") && (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="text-sm text-slate-600">
+                    {usage.tier === "free" ? "Or pay as you go — top up a balance, no subscription:" : "Top up your balance:"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {TOPUP_PRESETS_CENTS.map((cents) => (
+                      <button
+                        key={cents}
+                        onClick={() => startTopup(cents)}
+                        disabled={billingBusy !== null}
+                        className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                      >
+                        {billingBusy === cents ? "Redirecting…" : `+€${(cents / 100).toFixed(0)}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {usage.tier !== "free" && (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={billingBusy !== null}
+                  className="mt-4 rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                >
+                  {billingBusy === "portal" ? "Redirecting…" : "Manage billing"}
+                </button>
+              )}
+
+              {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-slate-900">Privacy & Cookies</h2>
+          <div className="mt-3 flex flex-wrap gap-4 rounded-lg border border-slate-200 p-5 text-sm">
+            <Link to="/legal/impressum" className="text-indigo-700 underline">
+              Impressum
+            </Link>
+            <Link to="/legal/datenschutz" className="text-indigo-700 underline">
+              Datenschutzerklärung
+            </Link>
+            <Link to="/legal/terms" className="text-indigo-700 underline">
+              Terms
+            </Link>
+          </div>
+        </div>
 
         <p className="mt-8 text-sm text-slate-500">Account deletion lands in a later phase.</p>
       </section>
