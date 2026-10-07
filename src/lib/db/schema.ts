@@ -226,6 +226,18 @@ export const contactSalesLead = sqliteTable("contact_sales_lead", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+// Generic kill-switch/rollout flags for the founder to toggle without a
+// deploy. Nothing in the app reads one yet -- this is the plumbing
+// (storage, admin UI, isFeatureEnabled()) so a future feature can be
+// gated behind a flag the moment it needs one, rather than needing a
+// migration + route + UI built from scratch at that point.
+export const featureFlag = sqliteTable("feature_flag", {
+  key: text("key").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  description: text("description"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const connector = sqliteTable("connector", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),

@@ -1,10 +1,12 @@
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { createDb } from "../lib/db/client";
-import { subscription } from "../lib/db/schema";
+import { subscription, contactSalesLead, featureFlag } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { requireAdmin } from "../middleware/require-admin";
 import { computeProcessingStats } from "../lib/stats";
+import { setFeatureFlag, deleteFeatureFlag } from "../lib/feature-flags";
+import { searchOwners } from "../lib/owner-search";
 import type { AppBindings } from "../types/hono";
 
 export const adminRoute = new Hono<AppBindings>();
@@ -104,4 +106,79 @@ adminRoute.put("/subscriptions/:ownerType/:ownerId/tier", requireAuth, requireAd
   }
 
   return c.json({ ok: true, tier });
+});
+
+// Contact-sales leads (POST /api/contact-sales), newest first, with a
+// status the founder updates by hand as they work through them -- no
+// CRM integration yet, this is the whole workflow.
+adminRoute.get("/leads", requireAuth, requireAdmin, async (c) => {
+  const db = createDb(c.env.DB);
+  const leads = await db.select().from(contactSalesLead).orderBy(desc(contactSalesLead.createdAt));
+  return c.json({ leads });
+});
+
+adminRoute.put("/leads/:id/status", requireAuth, requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{ status?: string }>().catch(() => null);
+  const status = body?.status;
+  if (status !== "new" && status !== "contacted" && status !== "closed") {
+    return c.json({ error: "invalid_status", allowed: ["new", "contacted", "closed"] }, 400);
+  }
+
+  const db = createDb(c.env.DB);
+  const result = await db.update(contactSalesLead).set({ status }).where(eq(contactSalesLead.id, id)).returning({ id: contactSalesLead.id });
+  if (result.length === 0) {
+    return c.json({ error: "lead_not_found" }, 404);
+  }
+  return c.json({ ok: true, status });
+});
+
+// Looks up candidate owners by email (user) or name (org) so the
+// founder can find the ownerType/ownerId the tier/retention PUT routes
+// above need without already knowing it -- those routes existed first
+// but had no way to discover their own path parameters from the UI.
+adminRoute.get("/owners/search", requireAuth, requireAdmin, async (c) => {
+  const q = c.req.query("q")?.trim();
+  if (!q) {
+    return c.json({ owners: [] });
+  }
+
+  const db = createDb(c.env.DB);
+  const owners = await searchOwners(db, q);
+  return c.json({ owners });
+});
+
+// Generic rollout/kill-switch flags -- nothing reads one yet (see
+// src/lib/feature-flags.ts), this is just the plumbing to toggle one
+// without a deploy the moment a feature needs gating.
+adminRoute.get("/feature-flags", requireAuth, requireAdmin, async (c) => {
+  const db = createDb(c.env.DB);
+  const flags = await db.select().from(featureFlag).orderBy(featureFlag.key);
+  return c.json({ flags });
+});
+
+adminRoute.put("/feature-flags/:key", requireAuth, requireAdmin, async (c) => {
+  const key = c.req.param("key");
+  if (!/^[a-z0-9_-]+$/.test(key)) {
+    return c.json(
+      { error: "invalid_key", message: "Keys may only contain lowercase letters, digits, underscores, and hyphens." },
+      400
+    );
+  }
+
+  const body = await c.req.json<{ enabled?: boolean; description?: string | null }>().catch(() => null);
+  if (typeof body?.enabled !== "boolean") {
+    return c.json({ error: "enabled_required" }, 400);
+  }
+
+  const db = createDb(c.env.DB);
+  await setFeatureFlag(db, key, body.enabled, body.description);
+  return c.json({ ok: true, key, enabled: body.enabled });
+});
+
+adminRoute.delete("/feature-flags/:key", requireAuth, requireAdmin, async (c) => {
+  const key = c.req.param("key");
+  const db = createDb(c.env.DB);
+  await deleteFeatureFlag(db, key);
+  return c.json({ ok: true });
 });

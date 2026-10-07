@@ -3,6 +3,30 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0] - 2026-10-07
+
+### Added
+
+- **Admin: lead review, plan overrides, and feature flags.** The Admin
+  page's "lands in a later phase" stub is filled in with three
+  sections:
+  - **Sales leads** (`GET /api/admin/leads`, `PUT /api/admin/leads/:id/status`)
+    -- lists `contact_sales_lead` rows newest-first with a status
+    dropdown (new/contacted/closed), the first UI for data that's been
+    collected since the landing page's contact form shipped but was
+    only ever readable by querying D1 directly.
+  - **Plan overrides** (`GET /api/admin/owners/search`) -- the
+    tier/retention-override PUT routes already existed but needed the
+    exact ownerType/ownerId already known to call; this searches by
+    user email or org name and shows each match's current tier and
+    retention override to edit inline.
+  - **Feature flags** (`GET/PUT/DELETE /api/admin/feature-flags`,
+    `src/lib/feature-flags.ts`'s `isFeatureEnabled`/`setFeatureFlag`/
+    `deleteFeatureFlag`) -- a generic toggle-without-a-deploy mechanism
+    (migration `0008`, `feature_flag` table). Nothing in the app reads
+    a flag yet; this is deliberately just the plumbing, built ahead of
+    a concrete need per the user's own call rather than waiting for one.
+
 ## [0.11.0] - 2026-10-07
 
 ### Added
