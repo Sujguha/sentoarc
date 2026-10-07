@@ -115,16 +115,26 @@ export default function AppShell() {
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
   const [tier, setTier] = useState<"free" | "pro" | "enterprise" | "metered">("free");
+  const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [workspace, setWorkspace] = useState<ActiveWorkspace | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProOrEnterprise = tier === "pro" || tier === "enterprise" || tier === "metered";
   const isViewer = workspace?.role === "viewer";
 
-  useEffect(() => {
+  function loadUsage() {
     fetch("/api/usage")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data && setTier((data as { tier: typeof tier }).tier))
+      .then((data) => {
+        if (!data) return;
+        const usage = data as { tier: typeof tier; balanceCents: number | null };
+        setTier(usage.tier);
+        setBalanceCents(usage.balanceCents);
+      })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadUsage();
     fetch("/api/organizations/active")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setWorkspace((data as { active: ActiveWorkspace | null } | null)?.active ?? null))
@@ -154,6 +164,7 @@ export default function AppShell() {
         clearInterval(pollRef.current);
         pollRef.current = null;
         loadRecentJobs();
+        loadUsage();
       }
     }
 
@@ -241,6 +252,7 @@ export default function AppShell() {
       } else {
         await uploadBulk(files);
       }
+      loadUsage();
     } catch {
       setUploadError("Upload failed — please check your connection and try again.");
     } finally {
@@ -264,6 +276,15 @@ export default function AppShell() {
             with your team.{" "}
             <Link to="/organization" className="text-indigo-700 underline">
               Switch workspace
+            </Link>
+          </p>
+        )}
+
+        {tier === "metered" && balanceCents !== null && (
+          <p className="mt-3 text-sm text-slate-600">
+            Balance: <span className="font-medium text-slate-900">€{(balanceCents / 100).toFixed(2)}</span>{" "}
+            <Link to="/account" className="text-indigo-700 underline">
+              Top up
             </Link>
           </p>
         )}
