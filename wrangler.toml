@@ -47,17 +47,11 @@ SENDGRID_FROM_NAME = "SENtoArc"
 # secret key does.
 STRIPE_PRICE_ID_MONTHLY = "price_1UNV3hCvTE3LMxwL7Lfq9VnM"
 STRIPE_PRICE_ID_YEARLY = "price_1UNV3iCvTE3LMxwLnfl8hPTt"
-# Pay-as-you-go: EUR 0.01 per unit (1 unit = 1 MB processed), recurring
-# monthly, usage-based, under its own "SENtoArc Pay-as-you-go" product
-# (not the flat-Pro one -- Checkout shows the product's own name, so
-# sharing the Pro product made checkout say "Subscribe to SENtoArc Pro"
-# for this plan too). The first attempt at this price
-# (price_1UNgNKCvTE3LMxwLUNAErE2X) turned out to be a one-off (single
-# payment) price, not recurring/usage-based -- Stripe rejects a one-off
-# price in Checkout's subscription mode outright, and it has no meter
-# attached. This is the corrected, actually-usage-based price.
-STRIPE_PRICE_ID_METERED = "price_1UNpCeCvTE3LMxwLlsIwRywf"
-STRIPE_METER_EVENT_NAME = "scorm_mb_processed"
+# Pay-as-you-go: prepaid balance, not a Stripe subscription -- topped up
+# via a one-time Checkout payment for whatever amount the customer picks
+# (no pre-created Stripe Price needed), deducted per upload before
+# processing starts. This is the price per MB processed, in cents.
+METERED_UNIT_PRICE_CENTS = "1"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET

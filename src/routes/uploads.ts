@@ -6,8 +6,7 @@ import { requireAuth } from "../middleware/require-auth";
 import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
 import { computeRetentionExpiresAt } from "../lib/retention";
 import { logAudit } from "../lib/audit";
-import { createStripeClient } from "../lib/billing/stripe-client";
-import { reportMeteredUsage } from "../lib/billing/metered-usage";
+import { chargeForUpload } from "../lib/billing/prepaid-balance";
 import type { AppBindings } from "../types/hono";
 import type { ProcessingQueueMessage } from "../types/env";
 
@@ -291,26 +290,34 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
     }
   }
 
-  await c.env.PACKAGES_BUCKET.put(row.r2KeyUpload, body);
-
   if (tier === "metered") {
-    // Best-effort end to end: billing reporting (Stripe call or the
-    // local audit-trail insert) must never block the upload pipeline
-    // the user is actually paying for.
-    try {
-      await reportMeteredUsage(createStripeClient(c.env), db, {
-        ownerType,
-        ownerId,
-        jobId: row.jobId,
-        packageId,
-        sizeBytes: body.byteLength,
-        stripeCustomerId: c.get("stripeCustomerId"),
-        meterEventName: c.env.STRIPE_METER_EVENT_NAME,
-      });
-    } catch (err) {
-      console.error(`Failed to record metered usage for package ${packageId}`, err);
+    // Prepaid: the balance must cover this upload BEFORE anything is
+    // stored or processed -- unlike the old postpaid design, there is
+    // no "process now, bill later" step here. A declined top-up is the
+    // customer's problem to fix before uploading again, never ours to
+    // collect on after the fact.
+    const charge = await chargeForUpload(db, {
+      ownerType,
+      ownerId,
+      jobId: row.jobId,
+      packageId,
+      sizeBytes: body.byteLength,
+      unitPriceCents: Number(c.env.METERED_UNIT_PRICE_CENTS),
+    });
+    if (!charge.ok) {
+      return c.json(
+        {
+          error: "insufficient_balance",
+          costCents: charge.costCents,
+          balanceCents: charge.balanceCents,
+          message: `This upload would cost €${(charge.costCents / 100).toFixed(2)}, but your balance is only €${(charge.balanceCents / 100).toFixed(2)}. Top up to continue.`,
+        },
+        402
+      );
     }
   }
+
+  await c.env.PACKAGES_BUCKET.put(row.r2KeyUpload, body);
 
   const now = new Date();
   await db.update(pkg).set({ status: "queued", updatedAt: now }).where(eq(pkg.id, packageId));

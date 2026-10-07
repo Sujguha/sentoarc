@@ -96,44 +96,6 @@ describe("POST /api/billing/webhook", () => {
     expect(row?.stripeSubscriptionId).toBe("sub_test_1");
   });
 
-  it("sets tier to metered when the subscription's price id matches the configured metered price", async () => {
-    const db = createDb(env.DB);
-    const now = new Date();
-    await db.insert(subscription).values({
-      id: crypto.randomUUID(),
-      ownerType: "user",
-      ownerId: "test-user-metered",
-      stripeCustomerId: "cus_test_metered",
-      stripeSubscriptionId: "sub_old_metered",
-      stripePriceId: null,
-      tier: "free",
-      status: "incomplete",
-      seats: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const payload = subscriptionUpdatedEvent({
-      customer: "cus_test_metered",
-      items: { data: [{ price: { id: "price_test_metered" }, quantity: undefined }] },
-    });
-    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
-    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
-      method: "POST",
-      headers: { "stripe-signature": signature },
-      body: payload,
-    });
-    expect(res.status).toBe(200);
-
-    const [row] = await db
-      .select()
-      .from(subscription)
-      .where(eq(subscription.stripeCustomerId, "cus_test_metered"))
-      .limit(1);
-    expect(row?.tier).toBe("metered");
-    expect(row?.stripePriceId).toBe("price_test_metered");
-  });
-
   it("downgrades to free when the subscription is cancelled", async () => {
     const db = createDb(env.DB);
     const now = new Date();
@@ -182,6 +144,92 @@ describe("POST /api/billing/webhook", () => {
     expect(row?.tier).toBe("free");
     expect(row?.status).toBe("canceled");
   });
+
+  // Pay-as-you-go is prepaid balance now, topped up via a one-time
+  // (mode: "payment") Checkout session rather than a subscription --
+  // this is the event that actually credits it.
+  it("credits a new prepaid balance and sets tier to metered for a first-time top-up", async () => {
+    const payload = JSON.stringify({
+      id: "evt_test_topup_1",
+      object: "event",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_topup_1",
+          object: "checkout.session",
+          mode: "payment",
+          client_reference_id: "test-user-topup-1",
+          customer: "cus_test_topup_1",
+          amount_total: 1000,
+        },
+      },
+    });
+    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
+    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+
+    const db = createDb(env.DB);
+    const [row] = await db
+      .select()
+      .from(subscription)
+      .where(eq(subscription.stripeCustomerId, "cus_test_topup_1"))
+      .limit(1);
+    expect(row).toMatchObject({ ownerId: "test-user-topup-1", tier: "metered", balanceCents: 1000, status: "active" });
+  });
+
+  it("adds to an existing balance without downgrading an already-paid tier", async () => {
+    const db = createDb(env.DB);
+    const now = new Date();
+    await db.insert(subscription).values({
+      id: crypto.randomUUID(),
+      ownerType: "user",
+      ownerId: "test-user-topup-2",
+      stripeCustomerId: "cus_test_topup_2",
+      tier: "pro",
+      status: "active",
+      balanceCents: 250,
+      seats: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const payload = JSON.stringify({
+      id: "evt_test_topup_2",
+      object: "event",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_topup_2",
+          object: "checkout.session",
+          mode: "payment",
+          client_reference_id: "test-user-topup-2",
+          customer: "cus_test_topup_2",
+          amount_total: 500,
+        },
+      },
+    });
+    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
+    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+
+    const [row] = await db
+      .select()
+      .from(subscription)
+      .where(eq(subscription.stripeCustomerId, "cus_test_topup_2"))
+      .limit(1);
+    // Already on Pro -- the top-up still credits the balance (dormant
+    // until/unless they ever drop to pay-as-you-go), but must not
+    // overwrite their paid tier.
+    expect(row).toMatchObject({ tier: "pro", balanceCents: 750 });
+  });
 });
 
 describe("POST /api/billing/checkout", () => {
@@ -190,6 +238,17 @@ describe("POST /api/billing/checkout", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ interval: "month" }),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/billing/topup", () => {
+  it("requires auth", async () => {
+    const res = await SELF.fetch("https://example.com/api/billing/topup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amountCents: 1000 }),
     });
     expect(res.status).toBe(401);
   });

@@ -102,6 +102,14 @@ export const subscription = sqliteTable("subscription", {
   // the admin panel, not the org's own admins. Overrides the tier-default
   // retention window (computeRetentionExpiresAt) when set.
   retentionDaysOverride: integer("retention_days_override"),
+  // Prepaid credit for the metered tier, in cents -- topped up via a
+  // one-time Stripe Checkout payment (see /api/billing/topup), deducted
+  // per upload before processing starts. Unlike a postpaid Stripe
+  // subscription billed after the fact, this means the money is
+  // already in hand before any service is delivered: a declined card
+  // at some later billing date can never leave already-delivered work
+  // uncollectible.
+  balanceCents: integer("balance_cents").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
@@ -161,11 +169,10 @@ export const packageIssue = sqliteTable("package_issue", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
-// One row per billable upload on the "metered" (pay-as-you-go) tier.
-// Written synchronously at upload time regardless of whether the Stripe
-// report below succeeds, so a Stripe outage never silently drops a
-// billable event -- stripeEventId staying null is what flags a row for
-// manual reconciliation.
+// One row per charged upload on the "metered" (pay-as-you-go) tier --
+// the local ledger of what was deducted from the prepaid balance
+// (see chargeForUpload) and when, for the owner's own reference and
+// for reconciling against Stripe's top-up payment history.
 export const meteredUsageEvent = sqliteTable("metered_usage_event", {
   id: text("id").primaryKey(),
   ownerType: text("owner_type", { enum: ["user", "org"] }).notNull(),
@@ -174,6 +181,9 @@ export const meteredUsageEvent = sqliteTable("metered_usage_event", {
   packageId: text("package_id").notNull().references(() => pkg.id, { onDelete: "cascade" }),
   sizeBytes: integer("size_bytes").notNull(),
   mbBilled: integer("mb_billed").notNull(),
+  // Unused since prepaid balance replaced Stripe-metered billing (there's
+  // no Stripe event to report anymore) -- kept rather than dropped to
+  // avoid a migration just to remove one always-null column.
   stripeEventId: text("stripe_event_id"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });

@@ -61,6 +61,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   files_required: "Please choose at least one file.",
   too_many_files: "Too many files in one bulk upload — please split into smaller batches.",
   plan_upgrade_required: "Bulk upload (multiple files at once) requires a Pro plan.",
+  insufficient_balance: "Your balance is too low for this upload — top up from your Account page.",
 };
 
 // We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
@@ -80,8 +81,12 @@ const INPUT_FORMAT_LABELS: Record<string, string> = {
   html: "HTML",
 };
 
-function friendlyError(code: string | undefined): string {
-  return (code && ERROR_MESSAGES[code]) ?? "Something went wrong — please try again.";
+// Prefers the server's own message (e.g. insufficient_balance includes
+// the exact cost/balance figures) over the static map, which exists for
+// error codes that never carry one.
+function friendlyError(body: { error?: string; message?: string } | undefined): string {
+  if (body?.message) return body.message;
+  return (body?.error && ERROR_MESSAGES[body.error]) ?? "Something went wrong — please try again.";
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -165,16 +170,16 @@ export default function AppShell() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name, sizeBytes: file.size }),
     });
-    const initBody = (await initRes.json()) as { error?: string; jobId?: string; uploadUrl?: string };
+    const initBody = (await initRes.json()) as { error?: string; message?: string; jobId?: string; uploadUrl?: string };
     if (!initRes.ok || !initBody.uploadUrl || !initBody.jobId) {
-      setUploadError(friendlyError(initBody.error));
+      setUploadError(friendlyError(initBody));
       return;
     }
 
     const uploadRes = await fetch(initBody.uploadUrl, { method: "PUT", body: file });
-    const uploadBody = (await uploadRes.json()) as { error?: string };
+    const uploadBody = (await uploadRes.json()) as { error?: string; message?: string };
     if (!uploadRes.ok) {
-      setUploadError(friendlyError(uploadBody.error));
+      setUploadError(friendlyError(uploadBody));
       return;
     }
 
@@ -189,11 +194,12 @@ export default function AppShell() {
     });
     const initBody = (await initRes.json()) as {
       error?: string;
+      message?: string;
       jobId?: string;
       packages?: { packageId: string; filename: string; uploadUrl: string }[];
     };
     if (!initRes.ok || !initBody.jobId || !initBody.packages) {
-      setUploadError(friendlyError(initBody.error));
+      setUploadError(friendlyError(initBody));
       return;
     }
 
@@ -203,8 +209,8 @@ export default function AppShell() {
       initBody.packages.map(async (p, i) => {
         const res = await fetch(p.uploadUrl, { method: "PUT", body: files[i] });
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          setUploadError(friendlyError(body.error));
+          const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          setUploadError(friendlyError(body));
         }
       })
     );

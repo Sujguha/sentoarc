@@ -3,6 +3,43 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-10-07
+
+### Changed
+
+- **Pay-as-you-go is now prepaid balance, not a postpaid Stripe
+  subscription.** The original design let uploads happen first and
+  billed for accumulated usage at the end of each month -- if a card
+  failed at that point, the service had already been delivered with no
+  way to collect for it. Replaced with a prepaid model: the customer
+  tops up a balance via a one-time Stripe Checkout payment (any amount
+  they choose, no pre-created Stripe Price needed), and each upload
+  atomically deducts its cost from that balance *before* anything is
+  stored or processed -- `POST /api/uploads/:packageId/file` now
+  returns `402 insufficient_balance` with the exact shortfall rather
+  than ever letting an unpayable upload through.
+  - `subscription.balanceCents` (migration `0006`) replaces the Stripe
+    Billing Meter as the source of truth for what's owed.
+  - `src/lib/billing/prepaid-balance.ts` (replacing
+    `billing/metered-usage.ts`) does the atomic charge: a single
+    conditional `UPDATE ... WHERE balance_cents >= cost`, so concurrent
+    uploads can never together over-deduct a balance that only covers
+    one of them -- verified with a 10-concurrent-charges-against-a-
+    5-cent-balance test (exactly 5 succeed, exactly 5 fail).
+  - `POST /api/billing/topup` (replacing the `plan: "metered"` branch
+    of `/checkout`) starts a `mode: "payment"` Checkout session with an
+    inline `price_data` line item for the chosen amount.
+  - The webhook's `checkout.session.completed` handler now branches on
+    `session.mode`: `"payment"` credits the balance (and upgrades a
+    free-tier owner to `metered`, without ever downgrading an existing
+    paid tier); `"subscription"` is unchanged (Pro only now -- tier is
+    never resolved from a subscription price id anymore, since
+    pay-as-you-go has no subscription to resolve one from).
+  - Account page shows the balance (in €) and top-up buttons (+€5/+€10/
+    +€25) instead of a "Start pay-as-you-go" subscribe button; the
+    upload UI surfaces the server's own insufficient-balance message
+    (exact cost vs. balance) instead of a generic error.
+
 ## [0.9.3] - 2026-10-06
 
 ### Added
