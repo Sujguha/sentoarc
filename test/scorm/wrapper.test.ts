@@ -5,6 +5,9 @@ import { validatePackage, hasErrors } from "../../src/lib/scorm/validator";
 import {
   wrapAsPdf,
   wrapAsVideo,
+  wrapAsAudio,
+  wrapAsImage,
+  wrapAsDocument,
   wrapAsPptx,
   wrapAsHtml,
   wrapAsHtmlZip,
@@ -53,10 +56,73 @@ describe("wrapAsPdf", () => {
 describe("wrapAsVideo", () => {
   it("produces a clean SCORM package with an auto-complete-on-ended video", () => {
     const videoBytes = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]);
-    const result = wrapAsVideo("Walkthrough", videoBytes);
+    const result = wrapAsVideo("Walkthrough", videoBytes, "mp4", "video/mp4");
     expect(storedBytes(result.files["content.mp4"] as Uint8Array | [Uint8Array, unknown])).toBe(videoBytes);
     const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
     expect(launchHtml).toContain("addEventListener(\"ended\"");
+    expectCleanScormPackage(result.files);
+  });
+
+  it("supports WebM with its own extension and MIME type", () => {
+    const videoBytes = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3]);
+    const result = wrapAsVideo("Walkthrough", videoBytes, "webm", "video/webm");
+    expect(storedBytes(result.files["content.webm"] as Uint8Array | [Uint8Array, unknown])).toBe(videoBytes);
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("video/webm");
+    expectCleanScormPackage(result.files);
+  });
+
+  it("supports MOV with its own extension and MIME type", () => {
+    const videoBytes = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]);
+    const result = wrapAsVideo("Walkthrough", videoBytes, "mov", "video/quicktime");
+    expect(storedBytes(result.files["content.mov"] as Uint8Array | [Uint8Array, unknown])).toBe(videoBytes);
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("video/quicktime");
+    expectCleanScormPackage(result.files);
+  });
+});
+
+describe("wrapAsAudio", () => {
+  it("produces a clean SCORM package with an auto-complete-on-ended audio player", () => {
+    const audioBytes = strToU8("fake mp3 bytes");
+    const result = wrapAsAudio("Podcast", audioBytes, "mp3", "audio/mpeg");
+    expect(storedBytes(result.files["content.mp3"] as Uint8Array | [Uint8Array, unknown])).toBe(audioBytes);
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("audio/mpeg");
+    expect(launchHtml).toContain("addEventListener(\"ended\"");
+    expectCleanScormPackage(result.files);
+  });
+});
+
+describe("wrapAsImage", () => {
+  it("produces a clean SCORM package embedding the image via <img>", () => {
+    const imageBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const result = wrapAsImage("Diagram", imageBytes, "png");
+    expect(storedBytes(result.files["content.png"] as Uint8Array | [Uint8Array, unknown])).toBe(imageBytes);
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("<img src=\"content.png\"");
+    expectCleanScormPackage(result.files);
+  });
+
+  it("never embeds SVG via <iframe> or <object>, only <img>", () => {
+    const svgBytes = strToU8("<svg><script>alert(1)</script></svg>");
+    const result = wrapAsImage("Icon", svgBytes, "svg");
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("<img src=\"content.svg\"");
+    expect(launchHtml).not.toContain("<iframe");
+    expect(launchHtml).not.toContain("<object");
+    expectCleanScormPackage(result.files);
+  });
+});
+
+describe("wrapAsDocument", () => {
+  it("produces a clean SCORM package with a download link (no in-browser rendering)", () => {
+    const docxBytes = strToU8("fake docx bytes");
+    const result = wrapAsDocument("Handbook", docxBytes, "docx", "Word");
+    expect(storedBytes(result.files["content.docx"] as Uint8Array | [Uint8Array, unknown])).toBe(docxBytes);
+    const launchHtml = new TextDecoder().decode(result.files["launch.html"] as Uint8Array);
+    expect(launchHtml).toContain("Word document");
+    expect(launchHtml).toContain("Download the document");
     expectCleanScormPackage(result.files);
   });
 });

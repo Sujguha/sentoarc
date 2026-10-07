@@ -94,8 +94,9 @@ export function wrapAsPdf(title: string, pdfBytes: Uint8Array): WrapResult {
   };
 }
 
-export function wrapAsVideo(title: string, videoBytes: Uint8Array): WrapResult {
-  const body = `<video id="scorm-video" controls style="max-height: 80vh;"><source src="content.mp4" type="video/mp4"></video>
+export function wrapAsVideo(title: string, videoBytes: Uint8Array, ext: string, mimeType: string): WrapResult {
+  const filename = `content.${ext}`;
+  const body = `<video id="scorm-video" controls style="max-height: 80vh;"><source src="${filename}" type="${mimeType}"></video>
     <script>
       document.getElementById("scorm-video").addEventListener("ended", function () {
         window.SCORM && window.SCORM.markComplete();
@@ -104,10 +105,66 @@ export function wrapAsVideo(title: string, videoBytes: Uint8Array): WrapResult {
   return {
     title,
     files: {
-      "imsmanifest.xml": strToU8(buildManifest(title, ["content.mp4"])),
+      "imsmanifest.xml": strToU8(buildManifest(title, [filename])),
       "launch.html": strToU8(buildLaunchPage(title, body)),
       "scormapi.js": strToU8(SCORM_API_JS),
-      "content.mp4": stored(videoBytes),
+      [filename]: stored(videoBytes),
+    },
+  };
+}
+
+export function wrapAsAudio(title: string, audioBytes: Uint8Array, ext: string, mimeType: string): WrapResult {
+  const filename = `content.${ext}`;
+  const body = `<audio id="scorm-audio" controls style="width: 100%;"><source src="${filename}" type="${mimeType}"></audio>
+    <script>
+      document.getElementById("scorm-audio").addEventListener("ended", function () {
+        window.SCORM && window.SCORM.markComplete();
+      });
+    </script>`;
+  return {
+    title,
+    files: {
+      "imsmanifest.xml": strToU8(buildManifest(title, [filename])),
+      "launch.html": strToU8(buildLaunchPage(title, body)),
+      "scormapi.js": strToU8(SCORM_API_JS),
+      [filename]: stored(audioBytes),
+    },
+  };
+}
+
+// Rendered via <img>, never <object>/<iframe> -- that also means an
+// uploaded SVG's embedded <script> (if any) never executes, since <img>
+// sandboxes SVG the same way it does raster formats.
+export function wrapAsImage(title: string, imageBytes: Uint8Array, ext: string): WrapResult {
+  const filename = `content.${ext}`;
+  const body = `<img src="${filename}" style="max-width: 100%; max-height: 80vh; display: block; margin: 0 auto;" />`;
+  return {
+    title,
+    files: {
+      "imsmanifest.xml": strToU8(buildManifest(title, [filename])),
+      "launch.html": strToU8(buildLaunchPage(title, body)),
+      "scormapi.js": strToU8(SCORM_API_JS),
+      [filename]: stored(imageBytes),
+    },
+  };
+}
+
+// Same "link out + Mark Complete" pattern as wrapAsPptx below -- no
+// in-browser rendering engine for Word/legacy-PowerPoint documents
+// either (that needs a conversion engine, a new dependency decision,
+// not something to add silently). label is what the launch page calls
+// it ("Word" or "PowerPoint").
+export function wrapAsDocument(title: string, docBytes: Uint8Array, ext: string, label: string): WrapResult {
+  const filename = `content.${ext}`;
+  const body = `<p>This content is a ${escapeXml(label)} document. <a href="${filename}" download>Download the document</a> to view it, then mark this lesson complete below.</p>
+    <p style="color: #64748b; font-size: 13px;">Note: in-browser document rendering isn't supported yet — this launch page links out to the file instead.</p>`;
+  return {
+    title,
+    files: {
+      "imsmanifest.xml": strToU8(buildManifest(title, [filename])),
+      "launch.html": strToU8(buildLaunchPage(title, body)),
+      "scormapi.js": strToU8(SCORM_API_JS),
+      [filename]: stored(docBytes),
     },
   };
 }
@@ -175,7 +232,29 @@ export function wrapAsScorm(type: Exclude<DetectedFileType, "scorm-zip" | "unkno
     case "pdf":
       return wrapAsPdf(title, bytes);
     case "mp4":
-      return wrapAsVideo(title, bytes);
+      return wrapAsVideo(title, bytes, "mp4", "video/mp4");
+    case "webm":
+      return wrapAsVideo(title, bytes, "webm", "video/webm");
+    case "mov":
+      return wrapAsVideo(title, bytes, "mov", "video/quicktime");
+    case "mp3":
+      return wrapAsAudio(title, bytes, "mp3", "audio/mpeg");
+    case "wav":
+      return wrapAsAudio(title, bytes, "wav", "audio/wav");
+    case "png":
+      return wrapAsImage(title, bytes, "png");
+    case "jpg":
+      return wrapAsImage(title, bytes, "jpg");
+    case "gif":
+      return wrapAsImage(title, bytes, "gif");
+    case "svg":
+      return wrapAsImage(title, bytes, "svg");
+    case "docx":
+      return wrapAsDocument(title, bytes, "docx", "Word");
+    case "doc":
+      return wrapAsDocument(title, bytes, "doc", "Word");
+    case "ppt":
+      return wrapAsDocument(title, bytes, "ppt", "PowerPoint");
     case "pptx":
       return wrapAsPptx(title, bytes);
     case "html":

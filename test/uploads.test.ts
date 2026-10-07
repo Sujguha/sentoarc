@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALLOWED_EXTENSIONS, extensionOf } from "../src/routes/uploads";
+import { ALLOWED_EXTENSIONS, extensionOf, maxBytesFor } from "../src/routes/uploads";
 
 describe("extensionOf", () => {
   for (const ext of ALLOWED_EXTENSIONS) {
@@ -47,5 +47,22 @@ describe("extensionOf", () => {
 
   it("rejects an empty filename", () => {
     expect(extensionOf("")).toBeNull();
+  });
+});
+
+describe("maxBytesFor", () => {
+  const env = { MAX_PACKAGE_SIZE_BYTES: "209715200", MAX_VIDEO_SIZE_BYTES: "524288000" };
+
+  it("uses the larger video cap for .mp4/.webm/.mov", () => {
+    expect(maxBytesFor(".mp4", env)).toBe(524288000);
+    expect(maxBytesFor(".webm", env)).toBe(524288000);
+    expect(maxBytesFor(".mov", env)).toBe(524288000);
+  });
+
+  it("uses the standard cap for every other allowed extension", () => {
+    for (const ext of ALLOWED_EXTENSIONS) {
+      if (ext === ".mp4" || ext === ".webm" || ext === ".mov") continue;
+      expect(maxBytesFor(ext, env)).toBe(209715200);
+    }
   });
 });

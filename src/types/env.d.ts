@@ -6,6 +6,11 @@ export interface Env {
 
   FREE_UPLOAD_LIMIT: string;
   MAX_PACKAGE_SIZE_BYTES: string;
+  // Video (.mp4/.webm/.mov) gets its own, larger cap -- Learning Arc
+  // itself accepts up to 500MB for video vs 200MB for everything else,
+  // and a flat cap sized for documents would reject videos the
+  // platform we're targeting would happily take directly.
+  MAX_VIDEO_SIZE_BYTES: string;
   FREE_RETENTION_HOURS: string;
   PRO_RETENTION_DAYS: string;
   ADMIN_EMAILS: string;

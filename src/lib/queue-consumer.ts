@@ -10,14 +10,25 @@ import type { Env, ProcessingQueueMessage } from "../types/env";
 
 const INPUT_FORMAT_BY_DETECTED_TYPE: Record<
   Exclude<DetectedFileType, "unknown" | "zip-of-zips">,
-  "scorm" | "pdf" | "mp4" | "pptx" | "html"
+  "scorm" | "pdf" | "mp4" | "webm" | "mov" | "pptx" | "ppt" | "docx" | "doc" | "html" | "mp3" | "wav" | "png" | "jpg" | "gif" | "svg"
 > = {
   "scorm-zip": "scorm",
   pdf: "pdf",
   mp4: "mp4",
+  webm: "webm",
+  mov: "mov",
   pptx: "pptx",
+  ppt: "ppt",
+  docx: "docx",
+  doc: "doc",
   html: "html",
   "html-zip": "html",
+  mp3: "mp3",
+  wav: "wav",
+  png: "png",
+  jpg: "jpg",
+  gif: "gif",
+  svg: "svg",
 };
 
 function deriveFixedKey(uploadKey: string): string {
@@ -117,7 +128,8 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   const detection = detectFileType(bytes);
 
   if (detection.type === "unknown") {
-    const msg = "This file isn't a recognized format (SCORM ZIP, PDF, MP4, PPTX, or HTML) and couldn't be processed.";
+    const msg =
+      "This file isn't a recognized format and couldn't be processed. Supported: SCORM ZIP, PDF, Word, PowerPoint, HTML, images, audio, and video.";
     await finishPackage(db, message, {
       status: "failed",
       errorMessage: msg,
@@ -338,7 +350,24 @@ interface FinishArgs {
   status: "pass" | "fixed" | "failed";
   errorMessage: string | null;
   issues: PackageIssue[];
-  inputFormat: "scorm" | "pdf" | "mp4" | "pptx" | "html" | null;
+  inputFormat:
+    | "scorm"
+    | "pdf"
+    | "mp4"
+    | "webm"
+    | "mov"
+    | "pptx"
+    | "ppt"
+    | "docx"
+    | "doc"
+    | "html"
+    | "mp3"
+    | "wav"
+    | "png"
+    | "jpg"
+    | "gif"
+    | "svg"
+    | null;
   scormVersionIn: string | null;
   scormVersionOut: string | null;
   r2KeyFixed: string | null;

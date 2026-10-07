@@ -35,7 +35,12 @@ crons = ["0 * * * *"]
 
 [vars]
 FREE_UPLOAD_LIMIT = "5"
-MAX_PACKAGE_SIZE_BYTES = "104857600"
+# Matches WalkMe Learning Arc's own documented limits: 200MB standard
+# document/asset upload, 500MB for video. (Learning Arc also caps video
+# at 60 minutes; we don't parse video duration, so that half of the
+# limit isn't enforced here -- only the byte size is.)
+MAX_PACKAGE_SIZE_BYTES = "209715200"
+MAX_VIDEO_SIZE_BYTES = "524288000"
 FREE_RETENTION_HOURS = "24"
 PRO_RETENTION_DAYS = "30"
 ADMIN_EMAILS = "sujoy.guha2@gmail.com"

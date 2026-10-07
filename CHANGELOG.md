@@ -3,6 +3,47 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.14.0] - 2026-10-07
+
+### Added
+
+- **Full WalkMe Learning Arc format coverage.** Every file type Learning
+  Arc itself documents as importable is now supported end-to-end, not
+  just the original PDF/MP4/PPTX/HTML set:
+  - **Source documents:** `.docx`/`.doc` (Word) and `.ppt` (legacy
+    PowerPoint), alongside the existing `.pptx`. Legacy binary Office
+    (`.doc`/`.ppt`) is detected via its OLE2/CFBF container magic plus a
+    UTF-16LE stream-name heuristic (`WordDocument` vs. `PowerPoint
+    Document`) rather than a full compound-file directory walk --
+    pragmatic given how rare real uploads in this format are expected to
+    be. `.xlsx`/`.xls` remain unsupported, matching Learning Arc's own
+    stated exclusion of spreadsheets.
+  - **Video:** `.webm` and `.mov` alongside the existing `.mp4`. MP4 vs.
+    MOV is disambiguated by the ISO-BMFF `ftyp` box's major brand
+    (`"qt  "` means MOV, everything else means MP4) -- the old detector
+    only checked for the box itself, not the brand, and would have
+    called every `.mov` an `.mp4`.
+  - **Audio:** `.mp3` (ID3v2 tag or a raw MPEG frame-sync) and `.wav`
+    (RIFF/WAVE header).
+  - **Images:** `.png`, `.jpg`, `.gif`, and `.svg`. SVG is deliberately
+    embedded via `<img src="content.svg">` in the generated launch page,
+    never `<iframe>`/`<object>` -- that's what keeps an uploaded SVG's
+    embedded `<script>` (if any) from ever executing, the same security
+    property browsers already give raster images.
+  - Every new type gets its own minimal SCORM 1.2 wrapper
+    (`wrapAsDocument`/`wrapAsAudio`/`wrapAsImage`, and `wrapAsVideo`
+    generalized to take an extension/MIME pair instead of being
+    MP4-only) following the same "link out and mark complete" or
+    "auto-complete on ended" patterns already used for PDF/PPTX/MP4.
+  - **Size limits now match Learning Arc's own documented caps**: 200MB
+    for everything except video, 500MB for video specifically (was a
+    single flat 100MB for all non-ZIP types). Learning Arc also caps
+    video at 60 minutes; that half of the limit isn't enforced here,
+    since checking it would mean parsing video metadata.
+  - No DB migration needed -- `package.input_format` has no CHECK
+    constraint in this schema, so widening its allowed values is a
+    TypeScript-level change only.
+
 ## [0.13.0] - 2026-10-07
 
 ### Added

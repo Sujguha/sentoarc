@@ -38,7 +38,24 @@ interface PackageDetail {
   id: string;
   originalFilename: string;
   status: string;
-  inputFormat: "scorm" | "pdf" | "mp4" | "pptx" | "html" | null;
+  inputFormat:
+    | "scorm"
+    | "pdf"
+    | "mp4"
+    | "webm"
+    | "mov"
+    | "pptx"
+    | "ppt"
+    | "docx"
+    | "doc"
+    | "html"
+    | "mp3"
+    | "wav"
+    | "png"
+    | "jpg"
+    | "gif"
+    | "svg"
+    | null;
   scormVersionIn: string | null;
   scormVersionOut: string | null;
   errorMessage: string | null;
@@ -52,7 +69,26 @@ interface JobDetail {
 
 const TERMINAL_JOB_STATUSES = new Set(["completed", "completed_with_errors", "failed"]);
 
-const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
+const ALLOWED_EXTENSIONS = [
+  ".zip",
+  ".pdf",
+  ".docx",
+  ".doc",
+  ".pptx",
+  ".ppt",
+  ".html",
+  ".htm",
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".mp3",
+  ".wav",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".svg",
+  ".gif",
+];
 
 // We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
 // WalkMe's own app so the user can drag the downloaded file in themselves.
@@ -111,8 +147,19 @@ export default function AppShell() {
     scorm: t("appShell.inputFormatLabels.scorm"),
     pdf: t("appShell.inputFormatLabels.pdf"),
     mp4: t("appShell.inputFormatLabels.mp4"),
+    webm: t("appShell.inputFormatLabels.mp4"),
+    mov: t("appShell.inputFormatLabels.mp4"),
     pptx: t("appShell.inputFormatLabels.pptx"),
+    ppt: t("appShell.inputFormatLabels.pptx"),
+    docx: t("appShell.inputFormatLabels.docx"),
+    doc: t("appShell.inputFormatLabels.docx"),
     html: t("appShell.inputFormatLabels.html"),
+    mp3: t("appShell.inputFormatLabels.mp3"),
+    wav: t("appShell.inputFormatLabels.mp3"),
+    png: t("appShell.inputFormatLabels.png"),
+    jpg: t("appShell.inputFormatLabels.png"),
+    gif: t("appShell.inputFormatLabels.png"),
+    svg: t("appShell.inputFormatLabels.png"),
   };
 
   function loadUsage() {

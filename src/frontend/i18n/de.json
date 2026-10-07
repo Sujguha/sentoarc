@@ -159,7 +159,7 @@
   },
   "appShell": {
     "title": "Paket hochladen",
-    "intro": "Haben Sie bereits ein SCORM-ZIP aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Video, eine Präsentation oder eine Webseite? Wir verpacken es in einen SCORM-1.2-Kurs für WalkMe Learning Arc.",
+    "intro": "Haben Sie bereits ein SCORM-ZIP aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Word-Dokument, eine Präsentation, eine Webseite, ein Bild, eine Audio- oder eine Videodatei? Wir verpacken es in einen SCORM-1.2-Kurs für WalkMe Learning Arc.",
     "uploadingAsPrefix": "Hochladen als",
     "uploadingAsSuffix": "({{role}}) — gemeinsam mit Ihrem Team genutzt.",
     "switchWorkspace": "Arbeitsbereich wechseln",
@@ -173,7 +173,7 @@
     "uploading": "Wird hochgeladen…",
     "hintBulk": " — wählen Sie mehrere Dateien oder ein einzelnes ZIP mit mehreren SCORM-Paket-ZIPs, um sie als ein Batch zu verarbeiten.",
     "hintSingle": ". Upgraden Sie auf Pro, um mehrere Pakete auf einmal hochzuladen.",
-    "acceptedTypes": "SCORM-ZIP, PDF, MP4, PPTX oder HTML",
+    "acceptedTypes": "SCORM-ZIP, PDF, Word, PowerPoint, HTML, Bilder, Audio und Video",
     "filesSelected": "{{count}} Dateien ausgewählt",
     "migrationReport": "Migrationsbericht",
     "exportCsv": "CSV exportieren",
@@ -197,10 +197,13 @@
       "pdf": "PDF",
       "mp4": "Video",
       "pptx": "PowerPoint",
+      "docx": "Word",
+      "mp3": "Audio",
+      "png": "Bild",
       "html": "HTML"
     },
     "errors": {
-      "unsupported_file_type": "Bitte wählen Sie eine SCORM-ZIP-, PDF-, MP4-, PPTX- oder HTML-Datei.",
+      "unsupported_file_type": "Bitte wählen Sie eine SCORM-ZIP-, PDF-, Word-, PowerPoint-, HTML-, Bild-, Audio- oder Videodatei.",
       "free_limit_reached": "Sie haben alle kostenlosen Uploads aufgebraucht. Upgraden Sie auf Pro für unbegrenzte Uploads.",
       "package_too_large": "Diese Datei ist für das aktuelle Tariflimit zu groß.",
       "size_bytes_required": "Dateigröße konnte nicht gelesen werden — bitte erneut versuchen.",

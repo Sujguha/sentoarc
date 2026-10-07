@@ -149,7 +149,7 @@ export const pkg = sqliteTable("package", {
     enum: ["pending", "queued", "processing", "pass", "fixed", "failed"],
   }).notNull().default("pending"),
   inputFormat: text("input_format", {
-    enum: ["scorm", "pdf", "mp4", "pptx", "html"],
+    enum: ["scorm", "pdf", "mp4", "webm", "mov", "pptx", "ppt", "docx", "doc", "html", "mp3", "wav", "png", "jpg", "gif", "svg"],
   }),
   scormVersionIn: text("scorm_version_in"),
   scormVersionOut: text("scorm_version_out"),

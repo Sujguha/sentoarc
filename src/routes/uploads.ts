@@ -8,7 +8,7 @@ import { computeRetentionExpiresAt } from "../lib/retention";
 import { logAudit } from "../lib/audit";
 import { chargeForUpload } from "../lib/billing/prepaid-balance";
 import type { AppBindings } from "../types/hono";
-import type { ProcessingQueueMessage } from "../types/env";
+import type { Env, ProcessingQueueMessage } from "../types/env";
 
 // Bulk upload (multiple files in one job) is a Pro/Enterprise feature —
 // Free stays "single packages only" per the pricing page.
@@ -26,11 +26,39 @@ export const uploadsRoute = new Hono<AppBindings>();
 // the queue consumer sniffs real file content via detectFileType()
 // before processing, so a mislabeled extension is rejected there, not
 // trusted here.
-export const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
+export const ALLOWED_EXTENSIONS = [
+  ".zip",
+  ".pdf",
+  ".docx",
+  ".doc",
+  ".pptx",
+  ".ppt",
+  ".html",
+  ".htm",
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".mp3",
+  ".wav",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".svg",
+  ".gif",
+];
+
+// Video gets the larger MAX_VIDEO_SIZE_BYTES cap (see env.d.ts) instead
+// of the standard document/asset cap -- matches how Learning Arc itself
+// treats video differently from everything else.
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov"];
 
 export function extensionOf(filename: string): string | null {
   const lower = filename.toLowerCase();
   return ALLOWED_EXTENSIONS.find((ext) => lower.endsWith(ext)) ?? null;
+}
+
+export function maxBytesFor(extension: string, env: Pick<Env, "MAX_PACKAGE_SIZE_BYTES" | "MAX_VIDEO_SIZE_BYTES">): number {
+  return Number(VIDEO_EXTENSIONS.includes(extension) ? env.MAX_VIDEO_SIZE_BYTES : env.MAX_PACKAGE_SIZE_BYTES);
 }
 
 uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
@@ -59,7 +87,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
     return c.json({ error: "size_bytes_required" }, 400);
   }
-  const maxBytes = Number(c.env.MAX_PACKAGE_SIZE_BYTES);
+  const maxBytes = maxBytesFor(extension, c.env);
   if (sizeBytes > maxBytes) {
     return c.json({ error: "package_too_large", maxBytes }, 413);
   }
@@ -152,7 +180,6 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
     return c.json({ error: "too_many_files", maxFiles: MAX_BULK_FILES }, 400);
   }
 
-  const maxBytes = Number(c.env.MAX_PACKAGE_SIZE_BYTES);
   const prepared: { filename: string; sizeBytes: number; extension: string }[] = [];
   for (const file of body.files) {
     if (!file?.filename) {
@@ -166,6 +193,7 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
     if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
       return c.json({ error: "size_bytes_required" }, 400);
     }
+    const maxBytes = maxBytesFor(extension, c.env);
     if (sizeBytes > maxBytes) {
       return c.json({ error: "package_too_large", maxBytes, filename: file.filename }, 413);
     }
@@ -234,6 +262,7 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
       jobId: pkg.jobId,
       status: pkg.status,
       r2KeyUpload: pkg.r2KeyUpload,
+      originalFilename: pkg.originalFilename,
       ownerType: job.ownerType,
       ownerId: job.ownerId,
     })
@@ -257,7 +286,7 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
   }
 
   const body = await c.req.arrayBuffer();
-  const maxBytes = Number(c.env.MAX_PACKAGE_SIZE_BYTES);
+  const maxBytes = maxBytesFor(extensionOf(row.originalFilename) ?? "", c.env);
   if (body.byteLength === 0) {
     return c.json({ error: "empty_upload" }, 400);
   }

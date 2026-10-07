@@ -313,6 +313,85 @@ describe("processPackageMessage: translation-path rewrite gating", () => {
   });
 });
 
+describe("processPackageMessage: wrap pipeline for newly supported formats", () => {
+  // One representative per new category (image, audio, document, video) --
+  // detect.test.ts/wrapper.test.ts already cover every format's detection
+  // and wrapping in isolation; these confirm the two stages are wired
+  // together correctly end-to-end through the real pipeline, landing in
+  // R2 with the right inputFormat and a clean "fixed" status.
+  it("wraps a PNG image upload as a SCORM package", async () => {
+    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", pngBytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+    expect(pkgRow?.inputFormat).toBe("png");
+    expect(pkgRow?.r2KeyFixed).toBeTruthy();
+
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames).toEqual(expect.arrayContaining(["imsmanifest.xml", "launch.html", "scormapi.js", "content.png"]));
+  });
+
+  it("wraps an MP3 audio upload as a SCORM package", async () => {
+    const mp3Bytes = new Uint8Array([0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00]); // ID3 tag
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", mp3Bytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+    expect(pkgRow?.inputFormat).toBe("mp3");
+
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames).toContain("content.mp3");
+  });
+
+  it("wraps a DOCX upload as a SCORM package", async () => {
+    const zip = buildZip({
+      "[Content_Types].xml": strToU8("<Types/>"),
+      "word/document.xml": strToU8("<document/>"),
+    });
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", zip);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+    expect(pkgRow?.inputFormat).toBe("docx");
+
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames).toContain("content.docx");
+  });
+
+  it("wraps a WebM video upload as a SCORM package", async () => {
+    const webmBytes = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03, 0x04]);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("free", webmBytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("fixed");
+    expect(pkgRow?.inputFormat).toBe("webm");
+
+    const fixedObject = await env.PACKAGES_BUCKET.get(pkgRow!.r2KeyFixed!);
+    const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
+    const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
+    expect(fixedNames).toContain("content.webm");
+  });
+});
+
 describe("processPackageMessage: processing stats", () => {
   // The Account/Admin "documents processed" stats read from
   // processingStat, not job/package directly, because those get purged
