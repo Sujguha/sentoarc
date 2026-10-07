@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { input as inputClass } from "../lib/ui";
 
 type PasswordInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">;
 
@@ -14,7 +15,7 @@ export function PasswordInput({ className, ...props }: PasswordInputProps) {
       <input
         {...props}
         type={visible ? "text" : "password"}
-        className={`w-full rounded-md border border-slate-300 py-2 pl-3 pr-10 ${className ?? ""}`}
+        className={inputClass(`pr-10 ${className ?? ""}`)}
       />
       <button
         type="button"

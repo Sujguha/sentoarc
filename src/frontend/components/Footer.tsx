@@ -5,9 +5,15 @@ export function Footer() {
     <footer className="mt-16 border-t border-slate-200 bg-slate-50">
       <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-slate-500">
         <div className="flex flex-wrap gap-4">
-          <Link to="/legal/impressum">Impressum</Link>
-          <Link to="/legal/datenschutz">Datenschutzerklärung</Link>
-          <Link to="/legal/terms">Terms</Link>
+          <Link to="/legal/impressum" className="transition-colors hover:text-slate-700">
+            Impressum
+          </Link>
+          <Link to="/legal/datenschutz" className="transition-colors hover:text-slate-700">
+            Datenschutzerklärung
+          </Link>
+          <Link to="/legal/terms" className="transition-colors hover:text-slate-700">
+            Terms
+          </Link>
         </div>
         <p className="mt-4 max-w-3xl">
           SENtoArc works with content exported from SAP Enable Now and

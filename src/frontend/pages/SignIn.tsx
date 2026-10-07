@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { PasswordInput } from "../components/PasswordInput";
 import { authClient } from "../lib/auth-client";
+import { button, input as inputClass } from "../lib/ui";
 
 // Only ever used as a same-origin client-side route (react-router
 // navigate / better-auth callbackURL), never as a fetch target or
@@ -61,19 +62,25 @@ export default function SignIn() {
       <section className="mx-auto max-w-sm px-6 py-16">
         <h1 className="text-2xl font-bold text-slate-900">Sign in</h1>
         <div className="mt-4 flex gap-4 text-sm">
-          <button onClick={() => setMode("password")} className={mode === "password" ? "font-semibold text-slate-900" : "text-slate-500"}>
+          <button
+            onClick={() => setMode("password")}
+            className={`transition-colors ${mode === "password" ? "font-semibold text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+          >
             Password
           </button>
-          <button onClick={() => setMode("magic-link")} className={mode === "magic-link" ? "font-semibold text-slate-900" : "text-slate-500"}>
+          <button
+            onClick={() => setMode("magic-link")}
+            className={`transition-colors ${mode === "magic-link" ? "font-semibold text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+          >
             Email link
           </button>
         </div>
 
         {mode === "password" ? (
           <form onSubmit={handlePasswordSignIn} className="mt-6 space-y-4">
-            <input name="email" required type="email" placeholder="Email" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input name="email" required type="email" placeholder="Email" className={inputClass()} />
             <PasswordInput name="password" required placeholder="Password" />
-            <button type="submit" disabled={submitting} className="w-full rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-50">
+            <button type="submit" disabled={submitting} className={`w-full ${button("primary", "md")}`}>
               {submitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
@@ -83,15 +90,18 @@ export default function SignIn() {
           </p>
         ) : (
           <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
-            <input name="email" required type="email" placeholder="Email" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-            <button type="submit" disabled={submitting} className="w-full rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-50">
+            <input name="email" required type="email" placeholder="Email" className={inputClass()} />
+            <button type="submit" disabled={submitting} className={`w-full ${button("primary", "md")}`}>
               {submitting ? "Sending…" : "Send sign-in link"}
             </button>
           </form>
         )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         <p className="mt-4 text-sm text-slate-500">
-          No account yet? <Link to="/sign-up" className="underline">Sign up</Link>
+          No account yet?{" "}
+          <Link to="/sign-up" className="underline transition-colors hover:text-slate-700">
+            Sign up
+          </Link>
         </p>
       </section>
     </Layout>

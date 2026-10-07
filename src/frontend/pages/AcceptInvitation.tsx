@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { authClient, useSession } from "../lib/auth-client";
+import { button, card } from "../lib/ui";
 
 interface InvitationDetail {
   organizationName: string;
@@ -56,7 +57,10 @@ export default function AcceptInvitation() {
         {!sessionPending && !session && (
           <p className="mt-4 text-sm text-slate-600">
             Sign in to accept this invitation:{" "}
-            <Link to={`/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-indigo-700 underline">
+            <Link
+              to={`/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+              className="text-indigo-700 underline transition-colors hover:text-indigo-900"
+            >
               sign in
             </Link>
             .
@@ -68,15 +72,11 @@ export default function AcceptInvitation() {
         {done && <p className="mt-4 rounded-md bg-green-50 px-4 py-2 text-sm text-green-800">You've joined the team — redirecting…</p>}
 
         {!error && !done && invitation && session && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-6">
+          <div className={`mt-6 ${card()}`}>
             <p className="text-slate-700">
               You've been invited to join <strong>{invitation.organizationName}</strong> as {invitation.role}.
             </p>
-            <button
-              onClick={accept}
-              disabled={busy}
-              className="mt-4 rounded-md bg-slate-900 px-5 py-2 text-sm text-white disabled:opacity-50"
-            >
+            <button onClick={accept} disabled={busy} className={`mt-4 ${button("primary", "md")}`}>
               {busy ? "Joining…" : "Accept invitation"}
             </button>
           </div>

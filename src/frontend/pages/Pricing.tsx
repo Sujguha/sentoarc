@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { button } from "../lib/ui";
 
 const tiers = [
   {
@@ -68,8 +69,8 @@ export default function Pricing() {
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className={`rounded-xl border p-6 ${
-                tier.highlighted ? "border-slate-900 shadow-lg" : "border-slate-200"
+              className={`rounded-xl border bg-white p-6 transition-shadow ${
+                tier.highlighted ? "border-slate-900 shadow-lg" : "border-slate-200 shadow-sm hover:shadow-md"
               }`}
             >
               <h2 className="text-lg font-semibold text-slate-900">{tier.name}</h2>
@@ -86,11 +87,7 @@ export default function Pricing() {
               </ul>
               <Link
                 to={tier.cta.to}
-                className={`mt-6 block rounded-md px-4 py-2 text-center text-sm font-medium ${
-                  tier.highlighted
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 text-slate-900"
-                }`}
+                className={`mt-6 w-full ${button(tier.highlighted ? "primary" : "secondary", "md")}`}
               >
                 {tier.cta.label}
               </Link>

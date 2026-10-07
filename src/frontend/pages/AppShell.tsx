@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { button } from "../lib/ui";
 
 interface ActiveWorkspace {
   id: string;
@@ -274,7 +275,7 @@ export default function AppShell() {
           <p className="mt-3 text-sm text-slate-500">
             Uploading as <strong className="text-slate-700">{workspace.name}</strong> ({workspace.role}) — shared
             with your team.{" "}
-            <Link to="/organization" className="text-indigo-700 underline">
+            <Link to="/organization" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
               Switch workspace
             </Link>
           </p>
@@ -283,17 +284,17 @@ export default function AppShell() {
         {tier === "metered" && balanceCents !== null && (
           <p className="mt-3 text-sm text-slate-600">
             Balance: <span className="font-medium text-slate-900">€{(balanceCents / 100).toFixed(2)}</span>{" "}
-            <Link to="/account" className="text-indigo-700 underline">
+            <Link to="/account" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
               Top up
             </Link>
           </p>
         )}
 
-        <div className="mt-6 rounded-lg border-2 border-dashed border-slate-300 p-8 text-center">
+        <div className="mt-6 rounded-xl border-2 border-dashed border-slate-300 p-8 text-center transition-colors hover:border-slate-400">
           {isViewer ? (
             <p className="text-sm text-slate-500">
               Viewers can see this team's uploads but can't add new ones.{" "}
-              <Link to="/organization" className="text-indigo-700 underline">
+              <Link to="/organization" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
                 Switch to your personal workspace
               </Link>{" "}
               to upload your own packages.
@@ -309,10 +310,7 @@ export default function AppShell() {
                 onChange={handleFileChange}
                 disabled={uploading}
               />
-              <label
-                htmlFor="file-input"
-                className="inline-block cursor-pointer rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
-              >
+              <label htmlFor="file-input" className={`cursor-pointer ${button("primary", "lg")}`}>
                 {uploading ? "Uploading…" : isProOrEnterprise ? "Choose file(s)" : "Choose a file"}
               </label>
             </>
@@ -340,7 +338,7 @@ export default function AppShell() {
               {isProOrEnterprise && (
                 <a
                   href={`/api/jobs/${jobDetail.job.id}/export.csv`}
-                  className="text-sm font-medium text-indigo-700 hover:underline"
+                  className="text-sm font-medium text-indigo-700 transition-colors hover:text-indigo-900 hover:underline"
                 >
                   Export CSV
                 </a>
@@ -348,7 +346,7 @@ export default function AppShell() {
             </div>
             <div className="mt-3 space-y-4">
               {jobDetail.packages.map((p) => (
-                <div key={p.id} className="rounded-lg border border-slate-200 p-4">
+                <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-900">{p.originalFilename}</span>
                     <StatusBadge status={p.status === "pending" || p.status === "queued" ? jobDetail.job.status : p.status} />
@@ -389,17 +387,14 @@ export default function AppShell() {
                   )}
                   {(p.status === "pass" || p.status === "fixed") && (
                     <div className="mt-3 flex items-center gap-2">
-                      <a
-                        href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`}
-                        className="inline-block rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white"
-                      >
+                      <a href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`} className={button("primary", "sm")}>
                         Download SCORM package
                       </a>
                       <a
                         href={WALKME_LEARNING_ARC_URL}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-4 py-1.5 text-sm font-medium text-indigo-700"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -422,7 +417,7 @@ export default function AppShell() {
         {recentJobs.length > 0 && (
           <div className="mt-12">
             <h2 className="text-lg font-semibold text-slate-900">Recent uploads</h2>
-            <ul className="mt-3 divide-y divide-slate-200 rounded-lg border border-slate-200">
+            <ul className="mt-3 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white shadow-sm">
               {recentJobs.map((j) => (
                 <li key={j.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
                   <div className="min-w-0">

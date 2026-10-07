@@ -3,6 +3,29 @@ import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { PasswordInput } from "../components/PasswordInput";
 import { authClient, useSession } from "../lib/auth-client";
+import { button, card } from "../lib/ui";
+
+function SectionIcon({ path }: { path: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 text-slate-400"
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+const ICON_GEAR =
+  "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z";
+const ICON_CARD = "M2 7h20M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7M6 15h4";
+const ICON_SHIELD = "M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3Z";
 
 interface Usage {
   tier: string;
@@ -148,8 +171,11 @@ export default function Account() {
         )}
 
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-900">Account settings</h2>
-          <div className="mt-3 rounded-lg border border-slate-200 p-5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <SectionIcon path={ICON_GEAR} />
+            Account settings
+          </h2>
+          <div className={`mt-3 ${card()}`}>
             <p className="font-medium text-slate-900">Change password</p>
             <form onSubmit={handleChangePassword} className="mt-3 max-w-sm space-y-3">
               <PasswordInput
@@ -172,11 +198,7 @@ export default function Account() {
                 minLength={8}
                 placeholder="Confirm new password"
               />
-              <button
-                type="submit"
-                disabled={passwordBusy}
-                className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-              >
+              <button type="submit" disabled={passwordBusy} className={button("primary", "md")}>
                 {passwordBusy ? "Updating…" : "Update password"}
               </button>
               {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
@@ -186,9 +208,12 @@ export default function Account() {
         </div>
 
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-900">Plans & Pricing</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <SectionIcon path={ICON_CARD} />
+            Plans & Pricing
+          </h2>
           {usage && (
-            <div className="mt-3 rounded-lg border border-slate-200 p-5">
+            <div className={`mt-3 ${card()}`}>
               <p className="font-medium text-slate-900">
                 Plan: <span className="capitalize">{usage.tier}</span>
               </p>
@@ -210,14 +235,14 @@ export default function Account() {
                   <button
                     onClick={() => startCheckout("month")}
                     disabled={billingBusy !== null}
-                    className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+                    className={button("primary", "md")}
                   >
                     {billingBusy === "month" ? "Redirecting…" : "Upgrade to Pro (monthly)"}
                   </button>
                   <button
                     onClick={() => startCheckout("year")}
                     disabled={billingBusy !== null}
-                    className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                    className={button("secondary", "md")}
                   >
                     {billingBusy === "year" ? "Redirecting…" : "Upgrade to Pro (yearly)"}
                   </button>
@@ -235,7 +260,7 @@ export default function Account() {
                         key={cents}
                         onClick={() => startTopup(cents)}
                         disabled={billingBusy !== null}
-                        className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                        className={button("secondary", "md")}
                       >
                         {billingBusy === cents ? "Redirecting…" : `+€${(cents / 100).toFixed(0)}`}
                       </button>
@@ -248,7 +273,7 @@ export default function Account() {
                 <button
                   onClick={openBillingPortal}
                   disabled={billingBusy !== null}
-                  className="mt-4 rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-900 disabled:opacity-50"
+                  className={`mt-4 ${button("secondary", "md")}`}
                 >
                   {billingBusy === "portal" ? "Redirecting…" : "Manage billing"}
                 </button>
@@ -260,15 +285,18 @@ export default function Account() {
         </div>
 
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-900">Privacy & Cookies</h2>
-          <div className="mt-3 flex flex-wrap gap-4 rounded-lg border border-slate-200 p-5 text-sm">
-            <Link to="/legal/impressum" className="text-indigo-700 underline">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <SectionIcon path={ICON_SHIELD} />
+            Privacy & Cookies
+          </h2>
+          <div className={`mt-3 flex flex-wrap gap-4 text-sm ${card()}`}>
+            <Link to="/legal/impressum" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
               Impressum
             </Link>
-            <Link to="/legal/datenschutz" className="text-indigo-700 underline">
+            <Link to="/legal/datenschutz" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
               Datenschutzerklärung
             </Link>
-            <Link to="/legal/terms" className="text-indigo-700 underline">
+            <Link to="/legal/terms" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
               Terms
             </Link>
           </div>

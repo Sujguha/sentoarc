@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Layout } from "../components/Layout";
 import { authClient } from "../lib/auth-client";
+import { button, card } from "../lib/ui";
 
 interface OrgSummary {
   id: string;
@@ -194,17 +195,24 @@ export default function Organization() {
 
         {error && <p className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
-        <div className="mt-8 rounded-lg border border-slate-200 p-5">
+        <div className={`mt-8 ${card()}`}>
           <h2 className="font-medium text-slate-900">Your workspaces</h2>
           {orgs.length === 0 && <p className="mt-2 text-sm text-slate-500">You're not part of any organization yet.</p>}
           <ul className="mt-3 space-y-2">
             {orgs.map((org) => (
-              <li key={org.id} className="flex items-center justify-between rounded-md border border-slate-100 px-3 py-2 text-sm">
+              <li
+                key={org.id}
+                className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
+              >
                 <span className={org.id === activeOrgId ? "font-medium text-slate-900" : "text-slate-600"}>
                   {org.name} {org.id === activeOrgId && <span className="text-xs text-indigo-600">(active)</span>}
                 </span>
                 {org.id !== activeOrgId && (
-                  <button onClick={() => switchTo(org.id)} disabled={busy} className="text-xs font-medium text-indigo-700 disabled:opacity-50">
+                  <button
+                    onClick={() => switchTo(org.id)}
+                    disabled={busy}
+                    className="text-xs font-medium text-indigo-700 transition-colors hover:text-indigo-900 disabled:opacity-50"
+                  >
                     Switch to this workspace
                   </button>
                 )}
@@ -212,7 +220,11 @@ export default function Organization() {
             ))}
           </ul>
           {activeOrgId && (
-            <button onClick={leaveWorkspace} disabled={busy} className="mt-3 text-xs text-slate-500 disabled:opacity-50">
+            <button
+              onClick={leaveWorkspace}
+              disabled={busy}
+              className="mt-3 text-xs text-slate-500 transition-colors hover:text-slate-700 disabled:opacity-50"
+            >
               Go back to your personal workspace
             </button>
           )}
@@ -223,13 +235,9 @@ export default function Organization() {
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 placeholder="New organization name"
-                className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
-              <button
-                type="submit"
-                disabled={busy || !newOrgName.trim()}
-                className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-              >
+              <button type="submit" disabled={busy || !newOrgName.trim()} className={button("primary", "sm")}>
                 Create
               </button>
             </form>
@@ -237,7 +245,7 @@ export default function Organization() {
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-600">
                 Organizations are part of the Enterprise plan, set up with our team rather than self-serve.{" "}
-                <a href="/#contact" className="font-medium text-indigo-700">
+                <a href="/#contact" className="font-medium text-indigo-700 transition-colors hover:text-indigo-900">
                   Contact sales
                 </a>{" "}
                 to get a workspace set up for your team.
@@ -247,7 +255,7 @@ export default function Organization() {
         </div>
 
         {activeOrg && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-5">
+          <div className={`mt-6 ${card()}`}>
             <h2 className="font-medium text-slate-900">Members of {activeOrg.name}</h2>
             <ul className="mt-3 divide-y divide-slate-100">
               {members.map((m) => (
@@ -259,7 +267,7 @@ export default function Organization() {
                         value={m.role}
                         onChange={(e) => changeRole(m.id, e.target.value as "admin" | "editor" | "viewer")}
                         disabled={busy}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                       >
                         <option value="admin">Admin</option>
                         <option value="editor">Editor</option>
@@ -269,7 +277,11 @@ export default function Organization() {
                       <span className="capitalize text-slate-500">{m.role}</span>
                     )}
                     {activeRole === "admin" && (
-                      <button onClick={() => removeMember(m.id)} disabled={busy} className="text-xs text-red-600 disabled:opacity-50">
+                      <button
+                        onClick={() => removeMember(m.id)}
+                        disabled={busy}
+                        className="text-xs text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
+                      >
                         Remove
                       </button>
                     )}
@@ -285,22 +297,18 @@ export default function Organization() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="teammate@company.com"
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as "admin" | "editor" | "viewer")}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
                   <option value="viewer">Viewer</option>
                 </select>
-                <button
-                  type="submit"
-                  disabled={busy || !inviteEmail.trim()}
-                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-                >
+                <button type="submit" disabled={busy || !inviteEmail.trim()} className={button("primary", "sm")}>
                   Invite
                 </button>
               </form>
@@ -309,7 +317,7 @@ export default function Organization() {
         )}
 
         {activeOrg && activeRole === "admin" && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-5">
+          <div className={`mt-6 ${card()}`}>
             <h2 className="font-medium text-slate-900">Audit log</h2>
             {auditEntries.length === 0 && <p className="mt-2 text-sm text-slate-500">No activity recorded yet.</p>}
             <ul className="mt-3 space-y-2 text-sm">

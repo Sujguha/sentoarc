@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { button, card, input as inputClass } from "../lib/ui";
 
 export default function Landing() {
   return (
@@ -28,10 +29,10 @@ function Hero() {
         package WalkMe Learning Arc will actually track correctly.
       </p>
       <div className="mt-8 flex justify-center gap-4">
-        <Link to="/sign-up" className="rounded-md bg-slate-900 px-5 py-2.5 text-white">
+        <Link to="/sign-up" className={button("primary", "lg")}>
           Try it free
         </Link>
-        <Link to="/pricing" className="rounded-md border border-slate-300 px-5 py-2.5">
+        <Link to="/pricing" className={button("secondary", "lg")}>
           See pricing
         </Link>
       </div>
@@ -80,7 +81,7 @@ function HowItWorks() {
       <h2 className="text-2xl font-semibold text-slate-900">How it works</h2>
       <ol className="mt-6 grid gap-6 sm:grid-cols-2">
         {steps.map((step, i) => (
-          <li key={step.title} className="rounded-lg border border-slate-200 p-5">
+          <li key={step.title} className={card("transition-shadow hover:shadow-md")}>
             <span className="text-sm font-medium text-slate-400">Step {i + 1}</span>
             <h3 className="mt-1 font-semibold text-slate-900">{step.title}</h3>
             <p className="mt-1 text-sm text-slate-600">{step.body}</p>
@@ -100,7 +101,7 @@ function PricingTeaser() {
         migrations, or talk to us about Enterprise if you have multiple
         teams.
       </p>
-      <Link to="/pricing" className="mt-6 inline-block text-slate-900 underline">
+      <Link to="/pricing" className="mt-6 inline-block text-slate-900 underline transition-colors hover:text-slate-600">
         View full pricing →
       </Link>
     </section>
@@ -179,16 +180,12 @@ function Contact() {
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <input name="companyName" required placeholder="Company name" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-          <input name="contactName" required placeholder="Your name" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-          <input name="email" required type="email" placeholder="Work email" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-          <input name="companySize" placeholder="Company size (optional)" className="w-full rounded-md border border-slate-300 px-3 py-2" />
-          <textarea name="message" placeholder="Anything we should know?" className="w-full rounded-md border border-slate-300 px-3 py-2" rows={3} />
-          <button
-            type="submit"
-            disabled={status === "sending"}
-            className="rounded-md bg-slate-900 px-5 py-2.5 text-white disabled:opacity-50"
-          >
+          <input name="companyName" required placeholder="Company name" className={inputClass()} />
+          <input name="contactName" required placeholder="Your name" className={inputClass()} />
+          <input name="email" required type="email" placeholder="Work email" className={inputClass()} />
+          <input name="companySize" placeholder="Company size (optional)" className={inputClass()} />
+          <textarea name="message" placeholder="Anything we should know?" className={inputClass()} rows={3} />
+          <button type="submit" disabled={status === "sending"} className={button("primary", "lg")}>
             {status === "sending" ? "Sending…" : "Contact sales"}
           </button>
           {status === "error" && (
