@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
 import { PasswordInput } from "../components/PasswordInput";
 import { StatsPanel, type ProcessingStats } from "../components/StatsPanel";
@@ -43,6 +44,7 @@ const TOPUP_PRESETS_CENTS = [500, 1000, 2500];
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
 
 export default function Account() {
+  const { t } = useTranslation();
   const { data: session } = useSession();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [stats, setStats] = useState<ProcessingStats | null>(null);
@@ -78,17 +80,13 @@ export default function Account() {
       });
       const body = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !body.url) {
-        setBillingError(
-          body.error === "billing_not_configured"
-            ? "That plan isn't available to self-serve yet — check back soon."
-            : "Couldn't start checkout — please try again."
-        );
+        setBillingError(body.error === "billing_not_configured" ? t("account.billingNotConfigured") : t("account.checkoutFailed"));
         setBillingBusy(null);
         return;
       }
       window.location.href = body.url;
     } catch {
-      setBillingError("Couldn't start checkout — please try again.");
+      setBillingError(t("account.checkoutFailed"));
       setBillingBusy(null);
     }
   }
@@ -104,13 +102,13 @@ export default function Account() {
       });
       const body = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !body.url) {
-        setBillingError("Couldn't start checkout — please try again.");
+        setBillingError(t("account.checkoutFailed"));
         setBillingBusy(null);
         return;
       }
       window.location.href = body.url;
     } catch {
-      setBillingError("Couldn't start checkout — please try again.");
+      setBillingError(t("account.checkoutFailed"));
       setBillingBusy(null);
     }
   }
@@ -120,11 +118,11 @@ export default function Account() {
     setPasswordError(null);
     setPasswordSuccess(null);
     if (newPassword.length < 8) {
-      setPasswordError("New password must be at least 8 characters.");
+      setPasswordError(t("account.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError("New passwords don't match.");
+      setPasswordError(t("account.passwordMismatch"));
       return;
     }
     setPasswordBusy(true);
@@ -135,13 +133,13 @@ export default function Account() {
     });
     setPasswordBusy(false);
     if (error) {
-      setPasswordError(error.message ?? "Couldn't update password — please try again.");
+      setPasswordError(error.message ?? t("account.passwordUpdateFailed"));
       return;
     }
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    setPasswordSuccess("Password updated.");
+    setPasswordSuccess(t("account.passwordUpdated"));
   }
 
   async function openBillingPortal() {
@@ -151,13 +149,13 @@ export default function Account() {
       const res = await fetch("/api/billing/portal", { method: "POST" });
       const body = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !body.url) {
-        setBillingError("Couldn't open billing — please try again.");
+        setBillingError(t("account.billingPortalFailed"));
         setBillingBusy(null);
         return;
       }
       window.location.href = body.url;
     } catch {
-      setBillingError("Couldn't open billing — please try again.");
+      setBillingError(t("account.billingPortalFailed"));
       setBillingBusy(null);
     }
   }
@@ -165,48 +163,46 @@ export default function Account() {
   return (
     <Layout>
       <section className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-bold text-slate-900">Account</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("account.title")}</h1>
         <p className="mt-2 text-slate-600">{session?.user.email}</p>
 
         {checkoutParam === "success" && (
-          <p className="mt-4 rounded-md bg-green-50 px-4 py-2 text-sm text-green-800">
-            Thanks! That's being processed — this can take a few seconds to show up below.
-          </p>
+          <p className="mt-4 rounded-md bg-green-50 px-4 py-2 text-sm text-green-800">{t("account.checkoutSuccess")}</p>
         )}
         {checkoutParam === "cancelled" && (
-          <p className="mt-4 rounded-md bg-slate-50 px-4 py-2 text-sm text-slate-600">Checkout cancelled.</p>
+          <p className="mt-4 rounded-md bg-slate-50 px-4 py-2 text-sm text-slate-600">{t("account.checkoutCancelled")}</p>
         )}
 
         <div className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <SectionIcon path={ICON_GEAR} />
-            Account settings
+            {t("account.accountSettings")}
           </h2>
           <div className={`mt-3 ${card()}`}>
-            <p className="font-medium text-slate-900">Change password</p>
+            <p className="font-medium text-slate-900">{t("account.changePassword")}</p>
             <form onSubmit={handleChangePassword} className="mt-3 max-w-sm space-y-3">
               <PasswordInput
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                placeholder="Current password"
+                placeholder={t("account.currentPasswordPlaceholder")}
               />
               <PasswordInput
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={8}
-                placeholder="New password"
+                placeholder={t("account.newPasswordPlaceholder")}
               />
               <PasswordInput
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
-                placeholder="Confirm new password"
+                placeholder={t("account.confirmPasswordPlaceholder")}
               />
               <button type="submit" disabled={passwordBusy} className={button("primary", "md")}>
-                {passwordBusy ? "Updating…" : "Update password"}
+                {passwordBusy ? t("account.updating") : t("account.updatePassword")}
               </button>
               {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
               {passwordSuccess && <p className="text-sm text-green-700">{passwordSuccess}</p>}
@@ -217,23 +213,24 @@ export default function Account() {
         <div className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <SectionIcon path={ICON_CARD} />
-            Plans & Pricing
+            {t("account.plansAndPricing")}
           </h2>
           {usage && (
             <div className={`mt-3 ${card()}`}>
               <p className="font-medium text-slate-900">
-                Plan: <span className="capitalize">{usage.tier}</span>
+                {t("account.planLabel")}{" "}
+                <span className="capitalize">{t(`account.tierNames.${usage.tier}`, { defaultValue: usage.tier })}</span>
               </p>
               {usage.tier === "free" && (
                 <p className="mt-1 text-sm text-slate-600">
-                  {usage.freeUploadsUsed} / {usage.freeUploadLimit} free uploads used
+                  {t("account.freeUploadsUsed", { used: usage.freeUploadsUsed, limit: usage.freeUploadLimit })}
                 </p>
               )}
               {usage.tier === "metered" && usage.balanceCents !== null && (
                 <p className="mt-1 text-sm text-slate-600">
-                  Balance: <span className="font-medium text-slate-900">€{(usage.balanceCents / 100).toFixed(2)}</span>
-                  {usage.meteredMbBilledLifetime !== null && ` · ${usage.meteredMbBilledLifetime} MB processed lifetime`}
-                  {" — prepaid, deducted per upload, no subscription"}
+                  {t("account.balance", { amount: `€${(usage.balanceCents / 100).toFixed(2)}` })}
+                  {usage.meteredMbBilledLifetime !== null && t("account.mbProcessedLifetime", { count: usage.meteredMbBilledLifetime })}
+                  {t("account.prepaidNote")}
                 </p>
               )}
 
@@ -244,14 +241,14 @@ export default function Account() {
                     disabled={billingBusy !== null}
                     className={button("primary", "md")}
                   >
-                    {billingBusy === "month" ? "Redirecting…" : "Upgrade to Pro (monthly)"}
+                    {billingBusy === "month" ? t("account.redirecting") : t("account.upgradeMonthly")}
                   </button>
                   <button
                     onClick={() => startCheckout("year")}
                     disabled={billingBusy !== null}
                     className={button("secondary", "md")}
                   >
-                    {billingBusy === "year" ? "Redirecting…" : "Upgrade to Pro (yearly)"}
+                    {billingBusy === "year" ? t("account.redirecting") : t("account.upgradeYearly")}
                   </button>
                 </div>
               )}
@@ -259,7 +256,7 @@ export default function Account() {
               {(usage.tier === "free" || usage.tier === "metered") && (
                 <div className="mt-4 border-t border-slate-100 pt-4">
                   <p className="text-sm text-slate-600">
-                    {usage.tier === "free" ? "Or pay as you go — top up a balance, no subscription:" : "Top up your balance:"}
+                    {usage.tier === "free" ? t("account.topUpPromptFree") : t("account.topUpPromptMetered")}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {TOPUP_PRESETS_CENTS.map((cents) => (
@@ -269,7 +266,7 @@ export default function Account() {
                         disabled={billingBusy !== null}
                         className={button("secondary", "md")}
                       >
-                        {billingBusy === cents ? "Redirecting…" : `+€${(cents / 100).toFixed(0)}`}
+                        {billingBusy === cents ? t("account.redirecting") : `+€${(cents / 100).toFixed(0)}`}
                       </button>
                     ))}
                   </div>
@@ -282,7 +279,7 @@ export default function Account() {
                   disabled={billingBusy !== null}
                   className={`mt-4 ${button("secondary", "md")}`}
                 >
-                  {billingBusy === "portal" ? "Redirecting…" : "Manage billing"}
+                  {billingBusy === "portal" ? t("account.redirecting") : t("account.manageBilling")}
                 </button>
               )}
 
@@ -294,7 +291,7 @@ export default function Account() {
         <div className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <SectionIcon path={ICON_CHART} />
-            Usage stats
+            {t("account.usageStats")}
           </h2>
           <div className="mt-3">{stats && <StatsPanel stats={stats} />}</div>
         </div>
@@ -302,22 +299,22 @@ export default function Account() {
         <div className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <SectionIcon path={ICON_SHIELD} />
-            Privacy & Cookies
+            {t("account.privacyAndCookies")}
           </h2>
           <div className={`mt-3 flex flex-wrap gap-4 text-sm ${card()}`}>
             <Link to="/legal/impressum" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              Impressum
+              {t("footer.impressum")}
             </Link>
             <Link to="/legal/datenschutz" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              Datenschutzerklärung
+              {t("footer.datenschutz")}
             </Link>
             <Link to="/legal/terms" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              Terms
+              {t("footer.terms")}
             </Link>
           </div>
         </div>
 
-        <p className="mt-8 text-sm text-slate-500">Account deletion lands in a later phase.</p>
+        <p className="mt-8 text-sm text-slate-500">{t("account.accountDeletionNote")}</p>
       </section>
     </Layout>
   );

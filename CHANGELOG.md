@@ -3,6 +3,36 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0] - 2026-10-07
+
+### Added
+
+- **German translation + language switcher.** Every customer-facing page
+  (Nav, Footer, Landing, Pricing, Sign in/up, the upload app, Account,
+  Organization, Accept Invitation) is now driven by `react-i18next`
+  instead of hardcoded English strings, with a full German translation
+  alongside English. A small EN/DE switcher in the nav bar persists the
+  choice in `localStorage` only (never sent anywhere).
+  - `src/frontend/i18n/{en,de}.json` hold every string; `src/lib/ui.ts`-
+    style helpers were not enough here since the content itself (not
+    just styling) now varies, so this is a real `t()` call at every
+    previous string literal.
+  - Deliberately **not** translated: the Admin page (founder-only
+    internal tool) and the legal pages (`/legal/*`), which already carry
+    their own "unreviewed AI-generated draft" caution — translating
+    draft legal text would compound that risk rather than reduce it.
+  - Server-returned error messages (e.g. a specific insufficient-balance
+    amount) still come back in English regardless of UI language, since
+    the server doesn't localize its own responses; this is a known,
+    narrow gap limited to a handful of dynamic error strings, not the
+    general UI.
+  - Verified by rendering Landing/Pricing/Sign in/Sign up in both
+    languages (Playwright) and scanning for leaked `namespace.key`
+    strings (a missing-translation tell) before shipping; caught and
+    fixed one real bug this way -- the Enterprise tier's "Contact us"
+    price was hardcoded outside the translation layer and stayed
+    English under German.
+
 ## [0.12.0] - 2026-10-07
 
 ### Added

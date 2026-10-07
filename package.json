@@ -22,8 +22,11 @@
     "fast-xml-parser": "^4.5.0",
     "fflate": "^0.8.2",
     "hono": "^4.6.13",
+    "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "^8.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.16",
     "react-router-dom": "^6.28.0",
     "stripe": "^17.4.0"
   },

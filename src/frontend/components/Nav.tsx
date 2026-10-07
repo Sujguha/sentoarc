@@ -1,12 +1,15 @@
 import { Link, NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSession, signOut } from "../lib/auth-client";
 import { button } from "../lib/ui";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `transition-colors ${isActive ? "font-medium text-slate-900" : "text-slate-600 hover:text-slate-900"}`;
 
 export function Nav() {
   const { data: session } = useSession();
+  const { t } = useTranslation();
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -19,33 +22,34 @@ export function Nav() {
         </Link>
         <div className="flex items-center gap-6 text-sm">
           <NavLink to="/pricing" className={navLinkClass}>
-            Pricing
+            {t("nav.pricing")}
           </NavLink>
           {session ? (
             <>
               <NavLink to="/app" className={navLinkClass}>
-                App
+                {t("nav.app")}
               </NavLink>
               <NavLink to="/organization" className={navLinkClass}>
-                Organization
+                {t("nav.organization")}
               </NavLink>
               <NavLink to="/account" className={navLinkClass}>
-                Account
+                {t("nav.account")}
               </NavLink>
               <button onClick={() => signOut()} className={button("secondary", "sm")}>
-                Sign out
+                {t("nav.signOut")}
               </button>
             </>
           ) : (
             <>
               <NavLink to="/sign-in" className={navLinkClass}>
-                Sign in
+                {t("nav.signIn")}
               </NavLink>
               <Link to="/sign-up" className={button("primary", "sm")}>
-                Get started
+                {t("nav.getStarted")}
               </Link>
             </>
           )}
+          <LanguageSwitcher />
         </div>
       </nav>
     </header>

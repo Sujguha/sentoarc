@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Layout } from "../components/Layout";
 import { button } from "../lib/ui";
 
@@ -19,10 +21,10 @@ interface JobSummary {
   filenames: string[];
 }
 
-function jobDisplayName(filenames: string[]): string {
+function jobDisplayName(filenames: string[], t: TFunction): string {
   if (filenames.length === 0) return "—";
   if (filenames.length === 1) return filenames[0]!;
-  return `${filenames[0]} + ${filenames.length - 1} more`;
+  return `${filenames[0]} ${t("appShell.plusMoreFiles", { count: filenames.length - 1 })}`;
 }
 
 interface PackageIssue {
@@ -52,19 +54,6 @@ const TERMINAL_JOB_STATUSES = new Set(["completed", "completed_with_errors", "fa
 
 const ALLOWED_EXTENSIONS = [".zip", ".pdf", ".mp4", ".pptx", ".html", ".htm"];
 
-const ERROR_MESSAGES: Record<string, string> = {
-  unsupported_file_type: "Please choose a SCORM ZIP, PDF, MP4, PPTX, or HTML file.",
-  free_limit_reached: "You've used all of your free uploads. Upgrade to Pro for unlimited uploads.",
-  package_too_large: "That file is too large for the current plan limit.",
-  size_bytes_required: "Couldn't read the file size — please try again.",
-  already_uploaded: "This upload has already been submitted.",
-  empty_upload: "The file appears to be empty.",
-  files_required: "Please choose at least one file.",
-  too_many_files: "Too many files in one bulk upload — please split into smaller batches.",
-  plan_upgrade_required: "Bulk upload (multiple files at once) requires a Pro plan.",
-  insufficient_balance: "Your balance is too low for this upload — top up from your Account page.",
-};
-
 // We don't have a confirmed Learning Arc API (see CHANGELOG) — this opens
 // WalkMe's own app so the user can drag the downloaded file in themselves.
 // Deep-links straight to Assets > SCORM Packages (confirmed from a real
@@ -74,20 +63,14 @@ const ERROR_MESSAGES: Record<string, string> = {
 // the one remaining step is clicking the import button themselves.
 const WALKME_LEARNING_ARC_URL = "https://app.learningarc.com/management/assets";
 
-const INPUT_FORMAT_LABELS: Record<string, string> = {
-  scorm: "SCORM",
-  pdf: "PDF",
-  mp4: "Video",
-  pptx: "PowerPoint",
-  html: "HTML",
-};
-
 // Prefers the server's own message (e.g. insufficient_balance includes
-// the exact cost/balance figures) over the static map, which exists for
-// error codes that never carry one.
-function friendlyError(body: { error?: string; message?: string } | undefined): string {
+// the exact cost/balance figures) over the translated static map, which
+// exists for error codes that never carry one. The server's own message
+// is always English (it's not user-facing copy the server localizes),
+// so this is a known gap for non-English users on those specific codes.
+function friendlyError(body: { error?: string; message?: string } | undefined, t: TFunction): string {
   if (body?.message) return body.message;
-  return (body?.error && ERROR_MESSAGES[body.error]) ?? "Something went wrong — please try again.";
+  return (body?.error && t(`appShell.errors.${body.error}`, { defaultValue: "" })) || t("appShell.errors.generic");
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -100,14 +83,16 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[status] ?? "bg-slate-100 text-slate-600"}`}>
-      {status.replace(/_/g, " ")}
+      {t(`appShell.statusLabels.${status}`, { defaultValue: status.replace(/_/g, " ") })}
     </span>
   );
 }
 
 export default function AppShell() {
+  const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileCount, setSelectedFileCount] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -121,6 +106,14 @@ export default function AppShell() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProOrEnterprise = tier === "pro" || tier === "enterprise" || tier === "metered";
   const isViewer = workspace?.role === "viewer";
+
+  const INPUT_FORMAT_LABELS: Record<string, string> = {
+    scorm: t("appShell.inputFormatLabels.scorm"),
+    pdf: t("appShell.inputFormatLabels.pdf"),
+    mp4: t("appShell.inputFormatLabels.mp4"),
+    pptx: t("appShell.inputFormatLabels.pptx"),
+    html: t("appShell.inputFormatLabels.html"),
+  };
 
   function loadUsage() {
     fetch("/api/usage")
@@ -184,14 +177,14 @@ export default function AppShell() {
     });
     const initBody = (await initRes.json()) as { error?: string; message?: string; jobId?: string; uploadUrl?: string };
     if (!initRes.ok || !initBody.uploadUrl || !initBody.jobId) {
-      setUploadError(friendlyError(initBody));
+      setUploadError(friendlyError(initBody, t));
       return;
     }
 
     const uploadRes = await fetch(initBody.uploadUrl, { method: "PUT", body: file });
     const uploadBody = (await uploadRes.json()) as { error?: string; message?: string };
     if (!uploadRes.ok) {
-      setUploadError(friendlyError(uploadBody));
+      setUploadError(friendlyError(uploadBody, t));
       return;
     }
 
@@ -211,7 +204,7 @@ export default function AppShell() {
       packages?: { packageId: string; filename: string; uploadUrl: string }[];
     };
     if (!initRes.ok || !initBody.jobId || !initBody.packages) {
-      setUploadError(friendlyError(initBody));
+      setUploadError(friendlyError(initBody, t));
       return;
     }
 
@@ -222,7 +215,7 @@ export default function AppShell() {
         const res = await fetch(p.uploadUrl, { method: "PUT", body: files[i] });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-          setUploadError(friendlyError(body));
+          setUploadError(friendlyError(body, t));
         }
       })
     );
@@ -236,7 +229,7 @@ export default function AppShell() {
     for (const file of files) {
       const lower = file.name.toLowerCase();
       if (!ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        setUploadError(ERROR_MESSAGES.unsupported_file_type!);
+        setUploadError(t("appShell.errors.unsupported_file_type"));
         return;
       }
     }
@@ -255,7 +248,7 @@ export default function AppShell() {
       }
       loadUsage();
     } catch {
-      setUploadError("Upload failed — please check your connection and try again.");
+      setUploadError(t("appShell.errors.connection"));
     } finally {
       setUploading(false);
     }
@@ -264,28 +257,24 @@ export default function AppShell() {
   return (
     <Layout>
       <section className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-bold text-slate-900">Upload a package</h1>
-        <p className="mt-2 text-slate-600">
-          Already have a SCORM ZIP from SAP Enable Now? We'll validate it and fix what we safely can. Have a PDF,
-          video, slide deck, or web page instead? We'll package it into a SCORM 1.2 course ready for WalkMe
-          Learning Arc.
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">{t("appShell.title")}</h1>
+        <p className="mt-2 text-slate-600">{t("appShell.intro")}</p>
 
         {workspace && (
           <p className="mt-3 text-sm text-slate-500">
-            Uploading as <strong className="text-slate-700">{workspace.name}</strong> ({workspace.role}) — shared
-            with your team.{" "}
+            {t("appShell.uploadingAsPrefix")} <strong className="text-slate-700">{workspace.name}</strong>{" "}
+            {t("appShell.uploadingAsSuffix", { role: workspace.role })}{" "}
             <Link to="/organization" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              Switch workspace
+              {t("appShell.switchWorkspace")}
             </Link>
           </p>
         )}
 
         {tier === "metered" && balanceCents !== null && (
           <p className="mt-3 text-sm text-slate-600">
-            Balance: <span className="font-medium text-slate-900">€{(balanceCents / 100).toFixed(2)}</span>{" "}
+            {t("appShell.balance", { amount: `€${(balanceCents / 100).toFixed(2)}` })}{" "}
             <Link to="/account" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              Top up
+              {t("appShell.topUp")}
             </Link>
           </p>
         )}
@@ -293,11 +282,11 @@ export default function AppShell() {
         <div className="mt-6 rounded-xl border-2 border-dashed border-slate-300 p-8 text-center transition-colors hover:border-slate-400">
           {isViewer ? (
             <p className="text-sm text-slate-500">
-              Viewers can see this team's uploads but can't add new ones.{" "}
+              {t("appShell.viewerNotice")}{" "}
               <Link to="/organization" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-                Switch to your personal workspace
+                {t("appShell.switchToPersonal")}
               </Link>{" "}
-              to upload your own packages.
+              {t("appShell.toUploadOwnPackages")}
             </p>
           ) : (
             <>
@@ -311,21 +300,19 @@ export default function AppShell() {
                 disabled={uploading}
               />
               <label htmlFor="file-input" className={`cursor-pointer ${button("primary", "lg")}`}>
-                {uploading ? "Uploading…" : isProOrEnterprise ? "Choose file(s)" : "Choose a file"}
+                {uploading ? t("appShell.uploading") : isProOrEnterprise ? t("appShell.chooseFiles") : t("appShell.chooseFile")}
               </label>
             </>
           )}
           {!isViewer && (
             <p className="mt-2 text-xs text-slate-400">
-              SCORM ZIP, PDF, MP4, PPTX, or HTML
-              {isProOrEnterprise
-                ? " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch."
-                : ". Upgrade to Pro to upload multiple packages at once."}
+              {t("appShell.acceptedTypes")}
+              {isProOrEnterprise ? t("appShell.hintBulk") : t("appShell.hintSingle")}
             </p>
           )}
           {selectedFile && !uploadError && (
             <p className="mt-3 text-sm text-slate-500">
-              {selectedFileCount > 1 ? `${selectedFileCount} files selected` : selectedFile.name}
+              {selectedFileCount > 1 ? t("appShell.filesSelected", { count: selectedFileCount }) : selectedFile.name}
             </p>
           )}
           {uploadError && <p className="mt-3 text-sm text-red-600">{uploadError}</p>}
@@ -334,13 +321,13 @@ export default function AppShell() {
         {jobDetail && (
           <div className="mt-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Migration report</h2>
+              <h2 className="text-lg font-semibold text-slate-900">{t("appShell.migrationReport")}</h2>
               {isProOrEnterprise && (
                 <a
                   href={`/api/jobs/${jobDetail.job.id}/export.csv`}
                   className="text-sm font-medium text-indigo-700 transition-colors hover:text-indigo-900 hover:underline"
                 >
-                  Export CSV
+                  {t("appShell.exportCsv")}
                 </a>
               )}
             </div>
@@ -388,7 +375,7 @@ export default function AppShell() {
                   {(p.status === "pass" || p.status === "fixed") && (
                     <div className="mt-3 flex items-center gap-2">
                       <a href={`/api/jobs/${jobDetail.job.id}/download/${p.id}`} className={button("primary", "sm")}>
-                        Download SCORM package
+                        {t("appShell.downloadPackage")}
                       </a>
                       <a
                         href={WALKME_LEARNING_ARC_URL}
@@ -401,14 +388,14 @@ export default function AppShell() {
                           <path d="M15 3h6v6" />
                           <path d="M10 14 21 3" />
                         </svg>
-                        Open Import SCORM in WalkMe
+                        {t("appShell.openInWalkMe")}
                       </a>
                     </div>
                   )}
                 </div>
               ))}
               {!TERMINAL_JOB_STATUSES.has(jobDetail.job.status) && (
-                <p className="text-sm text-slate-500">Processing…</p>
+                <p className="text-sm text-slate-500">{t("appShell.processing")}</p>
               )}
             </div>
           </div>
@@ -416,12 +403,12 @@ export default function AppShell() {
 
         {recentJobs.length > 0 && (
           <div className="mt-12">
-            <h2 className="text-lg font-semibold text-slate-900">Recent uploads</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t("appShell.recentUploads")}</h2>
             <ul className="mt-3 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white shadow-sm">
               {recentJobs.map((j) => (
                 <li key={j.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-900">{jobDisplayName(j.filenames)}</p>
+                    <p className="truncate font-medium text-slate-900">{jobDisplayName(j.filenames, t)}</p>
                     <p className="text-slate-500">{new Date(j.createdAt).toLocaleString()}</p>
                   </div>
                   <StatusBadge status={j.status} />

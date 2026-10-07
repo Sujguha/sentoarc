@@ -1,0 +1,300 @@
+{
+  "nav": {
+    "pricing": "Pricing",
+    "app": "App",
+    "organization": "Organization",
+    "account": "Account",
+    "signOut": "Sign out",
+    "signIn": "Sign in",
+    "getStarted": "Get started"
+  },
+  "footer": {
+    "impressum": "Impressum",
+    "datenschutz": "Datenschutzerklärung",
+    "terms": "Terms",
+    "disclaimer": "SENtoArc works with content exported from SAP Enable Now and prepares it for import into WalkMe Learning Arc. SENtoArc is not affiliated with, endorsed by, or sponsored by SAP SE or WalkMe Inc. SAP, SAP Enable Now, WalkMe, and WalkMe Learning Arc are trademarks of their respective owners."
+  },
+  "landing": {
+    "hero": {
+      "titleLine1": "Get your training content into WalkMe Learning Arc —",
+      "titleLine2": "without the SCORM headaches",
+      "body": "Already have a SCORM package from SAP Enable Now? We validate it and fix what we safely can. Have a PDF, video, slide deck, or web page instead? We package it into a SCORM course for you. Either way, you get a package WalkMe Learning Arc will actually track correctly.",
+      "tryFree": "Try it free",
+      "seePricing": "See pricing"
+    },
+    "problem": {
+      "title": "SAP Enable Now exports don't import cleanly — and not everything is SCORM to begin with",
+      "body1Prefix": "SAP Enable Now can export learning packages as SCORM, but WalkMe Learning Arc only accepts SCORM 1.2 ZIP files — and real-world exports commonly fail or track badly once imported: the wrong SCORM version, a missing or mis-cased launch file, and content marked as",
+      "body1Middle": "instead of",
+      "body1Suffix": "so completion is never recorded.",
+      "body2": "And plenty of useful training material was never SCORM at all — a PDF guide, a recorded walkthrough video, a slide deck, a one-off web page. Getting any of that into WalkMe Learning Arc normally means repackaging it by hand. SENtoArc does that part too."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "stepLabel": "Step {{number}}",
+      "steps": [
+        { "title": "Upload", "body": "A SCORM ZIP from SEN, or a PDF, video, slide deck, or web page." },
+        {
+          "title": "Validate or package",
+          "body": "SCORM gets checked for version, manifest, launch file, and scormtype issues. Everything else gets built into a fresh SCORM 1.2 course."
+        },
+        { "title": "Auto-fix", "body": "Safe fixes are applied automatically; anything risky is flagged instead of guessed." },
+        { "title": "Download", "body": "Get back a SCORM package ready for WalkMe, plus a per-package report." }
+      ]
+    },
+    "pricingTeaser": {
+      "title": "Simple pricing",
+      "body": "Start free with up to a handful of packages. Upgrade to Pro for bulk migrations, or talk to us about Enterprise if you have multiple teams.",
+      "link": "View full pricing →"
+    },
+    "faq": {
+      "title": "FAQ",
+      "items": [
+        {
+          "q": "What exactly do I upload?",
+          "a": "A SCORM ZIP that SAP Enable Now itself exported (we don't read SEN's internal workspace format, only its SCORM output), or a PDF, MP4 video, PPTX, or HTML file to be packaged into SCORM from scratch."
+        },
+        {
+          "q": "Does PDF/video/slide packaging look the same as a real SCORM course?",
+          "a": "It's a simple, single-screen launch page that embeds your content and tracks completion — for video, automatically when it ends; for everything else, with a Mark Complete button. PowerPoint files currently link out for download rather than rendering slide-by-slide in the browser."
+        },
+        {
+          "q": "Can every package be auto-fixed?",
+          "a": "No — some issues (like SCORM 2004 sequencing that can't be safely downgraded) are flagged rather than guessed at, with a clear explanation in the report."
+        },
+        {
+          "q": "Is my content stored permanently?",
+          "a": "No. Uploaded and fixed files are automatically deleted after a retention period tied to your plan (see pricing for details)."
+        }
+      ]
+    },
+    "contact": {
+      "title": "Enterprise? Let's talk",
+      "body": "Multiple teams, shared projects, and SSO-ready roles are handled on an Enterprise plan. Tell us about your migration and we'll follow up.",
+      "thanks": "Thanks — we'll be in touch shortly.",
+      "companyNamePlaceholder": "Company name",
+      "contactNamePlaceholder": "Your name",
+      "emailPlaceholder": "Work email",
+      "companySizePlaceholder": "Company size (optional)",
+      "messagePlaceholder": "Anything we should know?",
+      "submit": "Contact sales",
+      "sending": "Sending…",
+      "error": "Something went wrong — please try again."
+    }
+  },
+  "pricing": {
+    "title": "Pricing",
+    "tiers": {
+      "free": {
+        "name": "Free",
+        "description": "Try it on a handful of packages.",
+        "features": ["Up to 5 package uploads total", "Single packages only", "Fixed ZIP download", "On-screen report"],
+        "cta": "Sign up free"
+      },
+      "metered": {
+        "name": "Metered",
+        "cadence": "per MB processed (e.g. 10 MB ≈ €0.10)",
+        "description": "Pay as you go — no subscription, no commitment.",
+        "features": [
+          "No upload-count limit",
+          "Bulk upload (multiple ZIPs or a ZIP of ZIPs)",
+          "CSV report export",
+          "Translation-path rewrite",
+          "30-day job history"
+        ],
+        "cta": "Start pay-as-you-go"
+      },
+      "pro": {
+        "name": "Pro",
+        "cadence": "per user / month, billed monthly or yearly",
+        "description": "For ongoing migrations.",
+        "features": [
+          "Unlimited uploads",
+          "Bulk upload (multiple ZIPs or a ZIP of ZIPs)",
+          "CSV report export",
+          "Translation-path rewrite",
+          "30-day job history"
+        ],
+        "cta": "Start Pro"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Contact us",
+        "cadence": "per company",
+        "description": "For multiple teams migrating together.",
+        "features": [
+          "Multiple users with roles (admin / editor / viewer)",
+          "Shared migration projects",
+          "Full audit log",
+          "Configurable data retention"
+        ],
+        "cta": "Contact sales"
+      }
+    }
+  },
+  "signIn": {
+    "title": "Sign in",
+    "tabPassword": "Password",
+    "tabMagicLink": "Email link",
+    "emailPlaceholder": "Email",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "sendLink": "Send sign-in link",
+    "sending": "Sending…",
+    "magicLinkSent": "Check your email for a sign-in link.",
+    "noAccount": "No account yet?",
+    "signUpLink": "Sign up",
+    "errorFallback": "Sign in failed",
+    "magicLinkErrorFallback": "Could not send sign-in link"
+  },
+  "signUp": {
+    "title": "Create your account",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Work email",
+    "submit": "Sign up",
+    "submitting": "Creating account…",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "errorFallback": "Sign up failed"
+  },
+  "appShell": {
+    "title": "Upload a package",
+    "intro": "Already have a SCORM ZIP from SAP Enable Now? We'll validate it and fix what we safely can. Have a PDF, video, slide deck, or web page instead? We'll package it into a SCORM 1.2 course ready for WalkMe Learning Arc.",
+    "uploadingAsPrefix": "Uploading as",
+    "uploadingAsSuffix": "({{role}}) — shared with your team.",
+    "switchWorkspace": "Switch workspace",
+    "balance": "Balance: {{amount}}",
+    "topUp": "Top up",
+    "viewerNotice": "Viewers can see this team's uploads but can't add new ones.",
+    "switchToPersonal": "Switch to your personal workspace",
+    "toUploadOwnPackages": "to upload your own packages.",
+    "chooseFiles": "Choose file(s)",
+    "chooseFile": "Choose a file",
+    "uploading": "Uploading…",
+    "hintBulk": " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch.",
+    "hintSingle": ". Upgrade to Pro to upload multiple packages at once.",
+    "acceptedTypes": "SCORM ZIP, PDF, MP4, PPTX, or HTML",
+    "filesSelected": "{{count}} files selected",
+    "migrationReport": "Migration report",
+    "exportCsv": "Export CSV",
+    "downloadPackage": "Download SCORM package",
+    "openInWalkMe": "Open Import SCORM in WalkMe",
+    "processing": "Processing…",
+    "recentUploads": "Recent uploads",
+    "plusMoreFiles": "+{{count}} more",
+    "statusLabels": {
+      "pending": "pending",
+      "queued": "queued",
+      "processing": "processing",
+      "pass": "pass",
+      "fixed": "fixed",
+      "failed": "failed",
+      "completed": "completed",
+      "completed_with_errors": "completed with errors"
+    },
+    "inputFormatLabels": {
+      "scorm": "SCORM",
+      "pdf": "PDF",
+      "mp4": "Video",
+      "pptx": "PowerPoint",
+      "html": "HTML"
+    },
+    "errors": {
+      "unsupported_file_type": "Please choose a SCORM ZIP, PDF, MP4, PPTX, or HTML file.",
+      "free_limit_reached": "You've used all of your free uploads. Upgrade to Pro for unlimited uploads.",
+      "package_too_large": "That file is too large for the current plan limit.",
+      "size_bytes_required": "Couldn't read the file size — please try again.",
+      "already_uploaded": "This upload has already been submitted.",
+      "empty_upload": "The file appears to be empty.",
+      "files_required": "Please choose at least one file.",
+      "too_many_files": "Too many files in one bulk upload — please split into smaller batches.",
+      "plan_upgrade_required": "Bulk upload (multiple files at once) requires a Pro plan.",
+      "insufficient_balance": "Your balance is too low for this upload — top up from your Account page.",
+      "generic": "Something went wrong — please try again.",
+      "connection": "Upload failed — please check your connection and try again."
+    }
+  },
+  "account": {
+    "title": "Account",
+    "checkoutSuccess": "Thanks! That's being processed — this can take a few seconds to show up below.",
+    "checkoutCancelled": "Checkout cancelled.",
+    "accountSettings": "Account settings",
+    "changePassword": "Change password",
+    "currentPasswordPlaceholder": "Current password",
+    "newPasswordPlaceholder": "New password",
+    "confirmPasswordPlaceholder": "Confirm new password",
+    "updatePassword": "Update password",
+    "updating": "Updating…",
+    "passwordTooShort": "New password must be at least 8 characters.",
+    "passwordMismatch": "New passwords don't match.",
+    "passwordUpdated": "Password updated.",
+    "passwordUpdateFailed": "Couldn't update password — please try again.",
+    "plansAndPricing": "Plans & Pricing",
+    "planLabel": "Plan:",
+    "tierNames": {
+      "free": "free",
+      "pro": "pro",
+      "enterprise": "enterprise",
+      "metered": "metered"
+    },
+    "freeUploadsUsed": "{{used}} / {{limit}} free uploads used",
+    "balance": "Balance: {{amount}}",
+    "mbProcessedLifetime": " · {{count}} MB processed lifetime",
+    "prepaidNote": " — prepaid, deducted per upload, no subscription",
+    "upgradeMonthly": "Upgrade to Pro (monthly)",
+    "upgradeYearly": "Upgrade to Pro (yearly)",
+    "redirecting": "Redirecting…",
+    "topUpPromptFree": "Or pay as you go — top up a balance, no subscription:",
+    "topUpPromptMetered": "Top up your balance:",
+    "manageBilling": "Manage billing",
+    "billingNotConfigured": "That plan isn't available to self-serve yet — check back soon.",
+    "checkoutFailed": "Couldn't start checkout — please try again.",
+    "billingPortalFailed": "Couldn't open billing — please try again.",
+    "usageStats": "Usage stats",
+    "privacyAndCookies": "Privacy & Cookies",
+    "accountDeletionNote": "Account deletion lands in a later phase."
+  },
+  "organization": {
+    "title": "Organization",
+    "intro": "Enterprise workspaces: invite teammates, share migration projects, and track who did what.",
+    "yourWorkspaces": "Your workspaces",
+    "notPartOfOrg": "You're not part of any organization yet.",
+    "active": "(active)",
+    "switchToThisWorkspace": "Switch to this workspace",
+    "goBackToPersonal": "Go back to your personal workspace",
+    "newOrgNamePlaceholder": "New organization name",
+    "create": "Create",
+    "enterpriseSalesAssistNote": "Organizations are part of the Enterprise plan, set up with our team rather than self-serve.",
+    "contactSales": "Contact sales",
+    "toGetWorkspaceSetUp": "to get a workspace set up for your team.",
+    "membersOf": "Members of {{name}}",
+    "roleAdmin": "Admin",
+    "roleEditor": "Editor",
+    "roleViewer": "Viewer",
+    "remove": "Remove",
+    "inviteEmailPlaceholder": "teammate@company.com",
+    "invite": "Invite",
+    "auditLog": "Audit log",
+    "noActivity": "No activity recorded yet.",
+    "errors": {
+      "createOrg": "Couldn't create the organization.",
+      "switchWorkspace": "Couldn't switch workspace.",
+      "invite": "Couldn't send the invitation.",
+      "updateRole": "Couldn't update that member's role.",
+      "removeMember": "Couldn't remove that member."
+    }
+  },
+  "acceptInvitation": {
+    "title": "Organization invitation",
+    "signInPrompt": "Sign in to accept this invitation:",
+    "signInLink": "sign in",
+    "missingId": "This invitation link is missing its invitation ID.",
+    "notFound": "This invitation doesn't exist anymore, or has already been used.",
+    "acceptFailed": "Couldn't accept the invitation.",
+    "joined": "You've joined the team — redirecting…",
+    "invitedPrefix": "You've been invited to join",
+    "invitedSuffix": "as {{role}}.",
+    "accept": "Accept invitation",
+    "joining": "Joining…"
+  }
+}

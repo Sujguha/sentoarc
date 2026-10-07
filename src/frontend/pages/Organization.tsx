@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
 import { authClient } from "../lib/auth-client";
 import { button, card } from "../lib/ui";
@@ -37,6 +38,7 @@ function slugify(name: string): string {
 }
 
 export default function Organization() {
+  const { t } = useTranslation();
   const [orgs, setOrgs] = useState<OrgSummary[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<"admin" | "editor" | "viewer" | null>(null);
@@ -106,7 +108,7 @@ export default function Organization() {
     setError(null);
     const { error: err } = await authClient.organization.create({ name: newOrgName.trim(), slug: slugify(newOrgName) });
     if (err) {
-      setError(err.message ?? "Couldn't create the organization.");
+      setError(err.message ?? t("organization.errors.createOrg"));
       setBusy(false);
       return;
     }
@@ -121,7 +123,7 @@ export default function Organization() {
     setError(null);
     const { error: err } = await authClient.organization.setActive({ organizationId: orgId });
     if (err) {
-      setError(err.message ?? "Couldn't switch workspace.");
+      setError(err.message ?? t("organization.errors.switchWorkspace"));
     } else {
       await loadActive();
     }
@@ -147,7 +149,7 @@ export default function Organization() {
       organizationId: activeOrgId,
     });
     if (err) {
-      setError(err.message ?? "Couldn't send the invitation.");
+      setError(err.message ?? t("organization.errors.invite"));
     } else {
       setInviteEmail("");
       if (activeRole === "admin") await loadAuditLog(activeOrgId);
@@ -161,7 +163,7 @@ export default function Organization() {
     setError(null);
     const { error: err } = await authClient.organization.updateMemberRole({ memberId, role, organizationId: activeOrgId });
     if (err) {
-      setError(err.message ?? "Couldn't update that member's role.");
+      setError(err.message ?? t("organization.errors.updateRole"));
     } else {
       await loadMembers(activeOrgId);
       await loadAuditLog(activeOrgId);
@@ -175,7 +177,7 @@ export default function Organization() {
     setError(null);
     const { error: err } = await authClient.organization.removeMember({ memberIdOrEmail, organizationId: activeOrgId });
     if (err) {
-      setError(err.message ?? "Couldn't remove that member.");
+      setError(err.message ?? t("organization.errors.removeMember"));
     } else {
       await loadMembers(activeOrgId);
       await loadAuditLog(activeOrgId);
@@ -188,16 +190,14 @@ export default function Organization() {
   return (
     <Layout>
       <section className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-bold text-slate-900">Organization</h1>
-        <p className="mt-2 text-slate-600">
-          Enterprise workspaces: invite teammates, share migration projects, and track who did what.
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">{t("organization.title")}</h1>
+        <p className="mt-2 text-slate-600">{t("organization.intro")}</p>
 
         {error && <p className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
         <div className={`mt-8 ${card()}`}>
-          <h2 className="font-medium text-slate-900">Your workspaces</h2>
-          {orgs.length === 0 && <p className="mt-2 text-sm text-slate-500">You're not part of any organization yet.</p>}
+          <h2 className="font-medium text-slate-900">{t("organization.yourWorkspaces")}</h2>
+          {orgs.length === 0 && <p className="mt-2 text-sm text-slate-500">{t("organization.notPartOfOrg")}</p>}
           <ul className="mt-3 space-y-2">
             {orgs.map((org) => (
               <li
@@ -205,7 +205,7 @@ export default function Organization() {
                 className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
               >
                 <span className={org.id === activeOrgId ? "font-medium text-slate-900" : "text-slate-600"}>
-                  {org.name} {org.id === activeOrgId && <span className="text-xs text-indigo-600">(active)</span>}
+                  {org.name} {org.id === activeOrgId && <span className="text-xs text-indigo-600">{t("organization.active")}</span>}
                 </span>
                 {org.id !== activeOrgId && (
                   <button
@@ -213,7 +213,7 @@ export default function Organization() {
                     disabled={busy}
                     className="text-xs font-medium text-indigo-700 transition-colors hover:text-indigo-900 disabled:opacity-50"
                   >
-                    Switch to this workspace
+                    {t("organization.switchToThisWorkspace")}
                   </button>
                 )}
               </li>
@@ -225,7 +225,7 @@ export default function Organization() {
               disabled={busy}
               className="mt-3 text-xs text-slate-500 transition-colors hover:text-slate-700 disabled:opacity-50"
             >
-              Go back to your personal workspace
+              {t("organization.goBackToPersonal")}
             </button>
           )}
 
@@ -234,21 +234,21 @@ export default function Organization() {
               <input
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="New organization name"
+                placeholder={t("organization.newOrgNamePlaceholder")}
                 className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
               <button type="submit" disabled={busy || !newOrgName.trim()} className={button("primary", "sm")}>
-                Create
+                {t("organization.create")}
               </button>
             </form>
           ) : (
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-600">
-                Organizations are part of the Enterprise plan, set up with our team rather than self-serve.{" "}
+                {t("organization.enterpriseSalesAssistNote")}{" "}
                 <a href="/#contact" className="font-medium text-indigo-700 transition-colors hover:text-indigo-900">
-                  Contact sales
+                  {t("organization.contactSales")}
                 </a>{" "}
-                to get a workspace set up for your team.
+                {t("organization.toGetWorkspaceSetUp")}
               </p>
             </div>
           )}
@@ -256,7 +256,7 @@ export default function Organization() {
 
         {activeOrg && (
           <div className={`mt-6 ${card()}`}>
-            <h2 className="font-medium text-slate-900">Members of {activeOrg.name}</h2>
+            <h2 className="font-medium text-slate-900">{t("organization.membersOf", { name: activeOrg.name })}</h2>
             <ul className="mt-3 divide-y divide-slate-100">
               {members.map((m) => (
                 <li key={m.id} className="flex items-center justify-between py-2 text-sm">
@@ -269,12 +269,14 @@ export default function Organization() {
                         disabled={busy}
                         className="rounded-lg border border-slate-300 px-2 py-1 text-xs transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                       >
-                        <option value="admin">Admin</option>
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
+                        <option value="admin">{t("organization.roleAdmin")}</option>
+                        <option value="editor">{t("organization.roleEditor")}</option>
+                        <option value="viewer">{t("organization.roleViewer")}</option>
                       </select>
                     ) : (
-                      <span className="capitalize text-slate-500">{m.role}</span>
+                      <span className="capitalize text-slate-500">
+                        {m.role === "admin" ? t("organization.roleAdmin") : m.role === "editor" ? t("organization.roleEditor") : t("organization.roleViewer")}
+                      </span>
                     )}
                     {activeRole === "admin" && (
                       <button
@@ -282,7 +284,7 @@ export default function Organization() {
                         disabled={busy}
                         className="text-xs text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
                       >
-                        Remove
+                        {t("organization.remove")}
                       </button>
                     )}
                   </div>
@@ -296,7 +298,7 @@ export default function Organization() {
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="teammate@company.com"
+                  placeholder={t("organization.inviteEmailPlaceholder")}
                   className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 />
                 <select
@@ -304,12 +306,12 @@ export default function Organization() {
                   onChange={(e) => setInviteRole(e.target.value as "admin" | "editor" | "viewer")}
                   className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
-                  <option value="admin">Admin</option>
-                  <option value="editor">Editor</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="admin">{t("organization.roleAdmin")}</option>
+                  <option value="editor">{t("organization.roleEditor")}</option>
+                  <option value="viewer">{t("organization.roleViewer")}</option>
                 </select>
                 <button type="submit" disabled={busy || !inviteEmail.trim()} className={button("primary", "sm")}>
-                  Invite
+                  {t("organization.invite")}
                 </button>
               </form>
             )}
@@ -318,8 +320,8 @@ export default function Organization() {
 
         {activeOrg && activeRole === "admin" && (
           <div className={`mt-6 ${card()}`}>
-            <h2 className="font-medium text-slate-900">Audit log</h2>
-            {auditEntries.length === 0 && <p className="mt-2 text-sm text-slate-500">No activity recorded yet.</p>}
+            <h2 className="font-medium text-slate-900">{t("organization.auditLog")}</h2>
+            {auditEntries.length === 0 && <p className="mt-2 text-sm text-slate-500">{t("organization.noActivity")}</p>}
             <ul className="mt-3 space-y-2 text-sm">
               {auditEntries.map((entry) => (
                 <li key={entry.id} className="text-slate-600">

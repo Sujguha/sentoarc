@@ -1,0 +1,300 @@
+{
+  "nav": {
+    "pricing": "Preise",
+    "app": "App",
+    "organization": "Organisation",
+    "account": "Konto",
+    "signOut": "Abmelden",
+    "signIn": "Anmelden",
+    "getStarted": "Jetzt starten"
+  },
+  "footer": {
+    "impressum": "Impressum",
+    "datenschutz": "Datenschutzerklärung",
+    "terms": "Terms",
+    "disclaimer": "SENtoArc verarbeitet Inhalte, die aus SAP Enable Now exportiert wurden, und bereitet sie für den Import in WalkMe Learning Arc vor. SENtoArc steht in keiner Verbindung zu SAP SE oder WalkMe Inc. und wird von diesen weder unterstützt noch gesponsert. SAP, SAP Enable Now, WalkMe und WalkMe Learning Arc sind Marken ihrer jeweiligen Inhaber."
+  },
+  "landing": {
+    "hero": {
+      "titleLine1": "Bringen Sie Ihre Schulungsinhalte in WalkMe Learning Arc —",
+      "titleLine2": "ohne SCORM-Kopfschmerzen",
+      "body": "Haben Sie bereits ein SCORM-Paket aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Video, eine Präsentation oder eine Webseite? Wir verpacken es für Sie in einen SCORM-Kurs. So oder so erhalten Sie ein Paket, das WalkMe Learning Arc zuverlässig erfasst.",
+      "tryFree": "Kostenlos testen",
+      "seePricing": "Preise ansehen"
+    },
+    "problem": {
+      "title": "SAP-Enable-Now-Exporte lassen sich nicht sauber importieren — und nicht alles ist von Haus aus SCORM",
+      "body1Prefix": "SAP Enable Now kann Lernpakete als SCORM exportieren, aber WalkMe Learning Arc akzeptiert nur SCORM-1.2-ZIP-Dateien — und reale Exporte schlagen häufig fehl oder werden nach dem Import schlecht erfasst: die falsche SCORM-Version, eine fehlende oder falsch geschriebene Startdatei und Inhalte, die als",
+      "body1Middle": "statt als",
+      "body1Suffix": "markiert sind, sodass der Abschluss nie erfasst wird.",
+      "body2": "Und vieles an nützlichem Schulungsmaterial war nie SCORM — ein PDF-Leitfaden, ein aufgezeichnetes Video, eine Präsentation, eine einmalige Webseite. Das normalerweise von Hand in WalkMe Learning Arc zu bringen, ist aufwendig. Auch das übernimmt SENtoArc."
+    },
+    "howItWorks": {
+      "title": "So funktioniert's",
+      "stepLabel": "Schritt {{number}}",
+      "steps": [
+        { "title": "Hochladen", "body": "Ein SCORM-ZIP aus SEN oder ein PDF, Video, eine Präsentation oder Webseite." },
+        {
+          "title": "Prüfen oder verpacken",
+          "body": "SCORM wird auf Version, Manifest, Startdatei und Scormtype-Probleme geprüft. Alles andere wird zu einem neuen SCORM-1.2-Kurs verpackt."
+        },
+        { "title": "Automatisch beheben", "body": "Sichere Korrekturen werden automatisch angewendet; Riskantes wird markiert statt geraten." },
+        { "title": "Herunterladen", "body": "Sie erhalten ein für WalkMe fertiges SCORM-Paket sowie einen Bericht pro Paket." }
+      ]
+    },
+    "pricingTeaser": {
+      "title": "Einfache Preise",
+      "body": "Starten Sie kostenlos mit einer Handvoll Paketen. Upgraden Sie auf Pro für Massenmigrationen, oder sprechen Sie mit uns über Enterprise bei mehreren Teams.",
+      "link": "Alle Preise ansehen →"
+    },
+    "faq": {
+      "title": "Häufige Fragen",
+      "items": [
+        {
+          "q": "Was genau lade ich hoch?",
+          "a": "Ein SCORM-ZIP, das SAP Enable Now selbst exportiert hat (wir lesen nicht das interne Arbeitsbereichsformat von SEN, nur dessen SCORM-Ausgabe), oder eine PDF-, MP4-, PPTX- oder HTML-Datei, die neu als SCORM verpackt wird."
+        },
+        {
+          "q": "Sieht die PDF-/Video-/Präsentationsverpackung wie ein echter SCORM-Kurs aus?",
+          "a": "Es ist eine einfache Startseite mit einem Bildschirm, die Ihren Inhalt einbettet und den Abschluss erfasst — bei Video automatisch am Ende, sonst über eine „Abschließen“-Schaltfläche. PowerPoint-Dateien verlinken derzeit zum Download, statt Folie für Folie im Browser zu rendern."
+        },
+        {
+          "q": "Kann jedes Paket automatisch behoben werden?",
+          "a": "Nein — manche Probleme (etwa eine SCORM-2004-Sequenzierung, die sich nicht sicher herabstufen lässt) werden markiert statt geraten, mit einer klaren Erklärung im Bericht."
+        },
+        {
+          "q": "Werden meine Inhalte dauerhaft gespeichert?",
+          "a": "Nein. Hochgeladene und reparierte Dateien werden nach einer vom Tarif abhängigen Aufbewahrungsfrist automatisch gelöscht (Details siehe Preise)."
+        }
+      ]
+    },
+    "contact": {
+      "title": "Enterprise? Sprechen wir.",
+      "body": "Mehrere Teams, gemeinsame Projekte und SSO-fähige Rollen werden im Enterprise-Tarif abgedeckt. Erzählen Sie uns von Ihrer Migration, wir melden uns.",
+      "thanks": "Danke — wir melden uns in Kürze.",
+      "companyNamePlaceholder": "Firmenname",
+      "contactNamePlaceholder": "Ihr Name",
+      "emailPlaceholder": "Geschäftliche E-Mail",
+      "companySizePlaceholder": "Unternehmensgröße (optional)",
+      "messagePlaceholder": "Was sollten wir noch wissen?",
+      "submit": "Vertrieb kontaktieren",
+      "sending": "Wird gesendet…",
+      "error": "Etwas ist schiefgelaufen — bitte versuchen Sie es erneut."
+    }
+  },
+  "pricing": {
+    "title": "Preise",
+    "tiers": {
+      "free": {
+        "name": "Free",
+        "description": "Zum Ausprobieren mit einer Handvoll Paketen.",
+        "features": ["Bis zu 5 Paket-Uploads insgesamt", "Nur einzelne Pakete", "Fertiges ZIP zum Download", "Bericht auf dem Bildschirm"],
+        "cta": "Kostenlos registrieren"
+      },
+      "metered": {
+        "name": "Metered",
+        "cadence": "pro verarbeitetem MB (z. B. 10 MB ≈ 0,10 €)",
+        "description": "Pay-as-you-go — kein Abo, keine Verpflichtung.",
+        "features": [
+          "Kein Limit bei der Anzahl der Uploads",
+          "Massen-Upload (mehrere ZIPs oder ein ZIP aus ZIPs)",
+          "CSV-Berichtsexport",
+          "Übersetzungspfad-Korrektur",
+          "30 Tage Auftragsverlauf"
+        ],
+        "cta": "Pay-as-you-go starten"
+      },
+      "pro": {
+        "name": "Pro",
+        "cadence": "pro Nutzer / Monat, monatlich oder jährlich abgerechnet",
+        "description": "Für laufende Migrationen.",
+        "features": [
+          "Unbegrenzte Uploads",
+          "Massen-Upload (mehrere ZIPs oder ein ZIP aus ZIPs)",
+          "CSV-Berichtsexport",
+          "Übersetzungspfad-Korrektur",
+          "30 Tage Auftragsverlauf"
+        ],
+        "cta": "Pro starten"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Auf Anfrage",
+        "cadence": "pro Unternehmen",
+        "description": "Für mehrere Teams, die gemeinsam migrieren.",
+        "features": [
+          "Mehrere Nutzer mit Rollen (Admin / Editor / Betrachter)",
+          "Gemeinsame Migrationsprojekte",
+          "Vollständiges Audit-Log",
+          "Konfigurierbare Datenaufbewahrung"
+        ],
+        "cta": "Vertrieb kontaktieren"
+      }
+    }
+  },
+  "signIn": {
+    "title": "Anmelden",
+    "tabPassword": "Passwort",
+    "tabMagicLink": "E-Mail-Link",
+    "emailPlaceholder": "E-Mail",
+    "submit": "Anmelden",
+    "submitting": "Anmeldung läuft…",
+    "sendLink": "Anmeldelink senden",
+    "sending": "Wird gesendet…",
+    "magicLinkSent": "Prüfen Sie Ihr E-Mail-Postfach auf einen Anmeldelink.",
+    "noAccount": "Noch kein Konto?",
+    "signUpLink": "Registrieren",
+    "errorFallback": "Anmeldung fehlgeschlagen",
+    "magicLinkErrorFallback": "Anmeldelink konnte nicht gesendet werden"
+  },
+  "signUp": {
+    "title": "Konto erstellen",
+    "namePlaceholder": "Name",
+    "emailPlaceholder": "Geschäftliche E-Mail",
+    "submit": "Registrieren",
+    "submitting": "Konto wird erstellt…",
+    "haveAccount": "Bereits ein Konto?",
+    "signInLink": "Anmelden",
+    "errorFallback": "Registrierung fehlgeschlagen"
+  },
+  "appShell": {
+    "title": "Paket hochladen",
+    "intro": "Haben Sie bereits ein SCORM-ZIP aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Video, eine Präsentation oder eine Webseite? Wir verpacken es in einen SCORM-1.2-Kurs für WalkMe Learning Arc.",
+    "uploadingAsPrefix": "Hochladen als",
+    "uploadingAsSuffix": "({{role}}) — gemeinsam mit Ihrem Team genutzt.",
+    "switchWorkspace": "Arbeitsbereich wechseln",
+    "balance": "Guthaben: {{amount}}",
+    "topUp": "Aufladen",
+    "viewerNotice": "Betrachter können die Uploads dieses Teams sehen, aber keine neuen hinzufügen.",
+    "switchToPersonal": "Zu Ihrem persönlichen Arbeitsbereich wechseln",
+    "toUploadOwnPackages": "um eigene Pakete hochzuladen.",
+    "chooseFiles": "Datei(en) auswählen",
+    "chooseFile": "Datei auswählen",
+    "uploading": "Wird hochgeladen…",
+    "hintBulk": " — wählen Sie mehrere Dateien oder ein einzelnes ZIP mit mehreren SCORM-Paket-ZIPs, um sie als ein Batch zu verarbeiten.",
+    "hintSingle": ". Upgraden Sie auf Pro, um mehrere Pakete auf einmal hochzuladen.",
+    "acceptedTypes": "SCORM-ZIP, PDF, MP4, PPTX oder HTML",
+    "filesSelected": "{{count}} Dateien ausgewählt",
+    "migrationReport": "Migrationsbericht",
+    "exportCsv": "CSV exportieren",
+    "downloadPackage": "SCORM-Paket herunterladen",
+    "openInWalkMe": "SCORM-Import in WalkMe öffnen",
+    "processing": "Wird verarbeitet…",
+    "recentUploads": "Letzte Uploads",
+    "plusMoreFiles": "+{{count}} weitere",
+    "statusLabels": {
+      "pending": "ausstehend",
+      "queued": "in Warteschlange",
+      "processing": "wird verarbeitet",
+      "pass": "bestanden",
+      "fixed": "behoben",
+      "failed": "fehlgeschlagen",
+      "completed": "abgeschlossen",
+      "completed_with_errors": "mit Fehlern abgeschlossen"
+    },
+    "inputFormatLabels": {
+      "scorm": "SCORM",
+      "pdf": "PDF",
+      "mp4": "Video",
+      "pptx": "PowerPoint",
+      "html": "HTML"
+    },
+    "errors": {
+      "unsupported_file_type": "Bitte wählen Sie eine SCORM-ZIP-, PDF-, MP4-, PPTX- oder HTML-Datei.",
+      "free_limit_reached": "Sie haben alle kostenlosen Uploads aufgebraucht. Upgraden Sie auf Pro für unbegrenzte Uploads.",
+      "package_too_large": "Diese Datei ist für das aktuelle Tariflimit zu groß.",
+      "size_bytes_required": "Dateigröße konnte nicht gelesen werden — bitte erneut versuchen.",
+      "already_uploaded": "Dieser Upload wurde bereits übermittelt.",
+      "empty_upload": "Die Datei scheint leer zu sein.",
+      "files_required": "Bitte wählen Sie mindestens eine Datei.",
+      "too_many_files": "Zu viele Dateien in einem Massen-Upload — bitte in kleinere Stapel aufteilen.",
+      "plan_upgrade_required": "Massen-Upload (mehrere Dateien gleichzeitig) erfordert einen Pro-Tarif.",
+      "insufficient_balance": "Ihr Guthaben reicht für diesen Upload nicht aus — bitte auf der Konto-Seite aufladen.",
+      "generic": "Etwas ist schiefgelaufen — bitte versuchen Sie es erneut.",
+      "connection": "Upload fehlgeschlagen — bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+    }
+  },
+  "account": {
+    "title": "Konto",
+    "checkoutSuccess": "Danke! Das wird gerade verarbeitet — es kann einige Sekunden dauern, bis es unten erscheint.",
+    "checkoutCancelled": "Checkout abgebrochen.",
+    "accountSettings": "Kontoeinstellungen",
+    "changePassword": "Passwort ändern",
+    "currentPasswordPlaceholder": "Aktuelles Passwort",
+    "newPasswordPlaceholder": "Neues Passwort",
+    "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+    "updatePassword": "Passwort aktualisieren",
+    "updating": "Wird aktualisiert…",
+    "passwordTooShort": "Das neue Passwort muss mindestens 8 Zeichen lang sein.",
+    "passwordMismatch": "Die neuen Passwörter stimmen nicht überein.",
+    "passwordUpdated": "Passwort aktualisiert.",
+    "passwordUpdateFailed": "Passwort konnte nicht aktualisiert werden — bitte erneut versuchen.",
+    "plansAndPricing": "Tarife & Preise",
+    "planLabel": "Tarif:",
+    "tierNames": {
+      "free": "free",
+      "pro": "pro",
+      "enterprise": "enterprise",
+      "metered": "metered"
+    },
+    "freeUploadsUsed": "{{used}} / {{limit}} kostenlose Uploads verwendet",
+    "balance": "Guthaben: {{amount}}",
+    "mbProcessedLifetime": " · {{count}} MB insgesamt verarbeitet",
+    "prepaidNote": " — Guthaben, pro Upload abgebucht, kein Abo",
+    "upgradeMonthly": "Auf Pro upgraden (monatlich)",
+    "upgradeYearly": "Auf Pro upgraden (jährlich)",
+    "redirecting": "Weiterleitung…",
+    "topUpPromptFree": "Oder Pay-as-you-go — Guthaben aufladen, kein Abo:",
+    "topUpPromptMetered": "Guthaben aufladen:",
+    "manageBilling": "Abrechnung verwalten",
+    "billingNotConfigured": "Dieser Tarif ist noch nicht selbst buchbar — bitte später erneut versuchen.",
+    "checkoutFailed": "Checkout konnte nicht gestartet werden — bitte erneut versuchen.",
+    "billingPortalFailed": "Abrechnung konnte nicht geöffnet werden — bitte erneut versuchen.",
+    "usageStats": "Nutzungsstatistik",
+    "privacyAndCookies": "Datenschutz & Cookies",
+    "accountDeletionNote": "Die Kontolöschung folgt in einer späteren Phase."
+  },
+  "organization": {
+    "title": "Organisation",
+    "intro": "Enterprise-Arbeitsbereiche: Teammitglieder einladen, Migrationsprojekte teilen und nachvollziehen, wer was getan hat.",
+    "yourWorkspaces": "Ihre Arbeitsbereiche",
+    "notPartOfOrg": "Sie sind noch Teil keiner Organisation.",
+    "active": "(aktiv)",
+    "switchToThisWorkspace": "Zu diesem Arbeitsbereich wechseln",
+    "goBackToPersonal": "Zurück zu Ihrem persönlichen Arbeitsbereich",
+    "newOrgNamePlaceholder": "Name der neuen Organisation",
+    "create": "Erstellen",
+    "enterpriseSalesAssistNote": "Organisationen sind Teil des Enterprise-Tarifs und werden gemeinsam mit unserem Team statt im Selbstbedienungsverfahren eingerichtet.",
+    "contactSales": "Vertrieb kontaktieren",
+    "toGetWorkspaceSetUp": "um einen Arbeitsbereich für Ihr Team einzurichten.",
+    "membersOf": "Mitglieder von {{name}}",
+    "roleAdmin": "Admin",
+    "roleEditor": "Editor",
+    "roleViewer": "Betrachter",
+    "remove": "Entfernen",
+    "inviteEmailPlaceholder": "teammitglied@firma.de",
+    "invite": "Einladen",
+    "auditLog": "Audit-Log",
+    "noActivity": "Noch keine Aktivität erfasst.",
+    "errors": {
+      "createOrg": "Die Organisation konnte nicht erstellt werden.",
+      "switchWorkspace": "Arbeitsbereich konnte nicht gewechselt werden.",
+      "invite": "Einladung konnte nicht gesendet werden.",
+      "updateRole": "Die Rolle dieses Mitglieds konnte nicht aktualisiert werden.",
+      "removeMember": "Das Mitglied konnte nicht entfernt werden."
+    }
+  },
+  "acceptInvitation": {
+    "title": "Organisationseinladung",
+    "signInPrompt": "Melden Sie sich an, um diese Einladung anzunehmen:",
+    "signInLink": "anmelden",
+    "missingId": "Diesem Einladungslink fehlt die Einladungs-ID.",
+    "notFound": "Diese Einladung existiert nicht mehr oder wurde bereits verwendet.",
+    "acceptFailed": "Die Einladung konnte nicht angenommen werden.",
+    "joined": "Sie sind dem Team beigetreten — Weiterleitung…",
+    "invitedPrefix": "Sie wurden eingeladen,",
+    "invitedSuffix": "als {{role}} beizutreten.",
+    "accept": "Einladung annehmen",
+    "joining": "Wird beigetreten…"
+  }
+}

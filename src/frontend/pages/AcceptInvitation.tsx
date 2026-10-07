@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
 import { authClient, useSession } from "../lib/auth-client";
 import { button, card } from "../lib/ui";
@@ -11,6 +12,7 @@ interface InvitationDetail {
 }
 
 export default function AcceptInvitation() {
+  const { t } = useTranslation();
   const { data: session, isPending: sessionPending } = useSession();
   const navigate = useNavigate();
   const invitationId = new URLSearchParams(window.location.search).get("id");
@@ -22,17 +24,17 @@ export default function AcceptInvitation() {
 
   useEffect(() => {
     if (!invitationId) {
-      setError("This invitation link is missing its invitation ID.");
+      setError(t("acceptInvitation.missingId"));
       return;
     }
     authClient.organization.getInvitation({ query: { id: invitationId } }).then(({ data, error: err }) => {
       if (err || !data) {
-        setError("This invitation doesn't exist anymore, or has already been used.");
+        setError(t("acceptInvitation.notFound"));
         return;
       }
       setInvitation(data as unknown as InvitationDetail);
     });
-  }, [invitationId]);
+  }, [invitationId, t]);
 
   async function accept() {
     if (!invitationId) return;
@@ -40,7 +42,7 @@ export default function AcceptInvitation() {
     setError(null);
     const { error: err } = await authClient.organization.acceptInvitation({ invitationId });
     if (err) {
-      setError(err.message ?? "Couldn't accept the invitation.");
+      setError(err.message ?? t("acceptInvitation.acceptFailed"));
       setBusy(false);
       return;
     }
@@ -52,16 +54,16 @@ export default function AcceptInvitation() {
   return (
     <Layout>
       <section className="mx-auto max-w-md px-6 py-16 text-center">
-        <h1 className="text-2xl font-bold text-slate-900">Organization invitation</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("acceptInvitation.title")}</h1>
 
         {!sessionPending && !session && (
           <p className="mt-4 text-sm text-slate-600">
-            Sign in to accept this invitation:{" "}
+            {t("acceptInvitation.signInPrompt")}{" "}
             <Link
               to={`/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}
               className="text-indigo-700 underline transition-colors hover:text-indigo-900"
             >
-              sign in
+              {t("acceptInvitation.signInLink")}
             </Link>
             .
           </p>
@@ -69,15 +71,16 @@ export default function AcceptInvitation() {
 
         {error && <p className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
-        {done && <p className="mt-4 rounded-md bg-green-50 px-4 py-2 text-sm text-green-800">You've joined the team — redirecting…</p>}
+        {done && <p className="mt-4 rounded-md bg-green-50 px-4 py-2 text-sm text-green-800">{t("acceptInvitation.joined")}</p>}
 
         {!error && !done && invitation && session && (
           <div className={`mt-6 ${card()}`}>
             <p className="text-slate-700">
-              You've been invited to join <strong>{invitation.organizationName}</strong> as {invitation.role}.
+              {t("acceptInvitation.invitedPrefix")} <strong>{invitation.organizationName}</strong>{" "}
+              {t("acceptInvitation.invitedSuffix", { role: invitation.role })}
             </p>
             <button onClick={accept} disabled={busy} className={`mt-4 ${button("primary", "md")}`}>
-              {busy ? "Joining…" : "Accept invitation"}
+              {busy ? t("acceptInvitation.joining") : t("acceptInvitation.accept")}
             </button>
           </div>
         )}
