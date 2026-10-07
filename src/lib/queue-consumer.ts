@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db/client";
-import { job, pkg, packageIssue } from "./db/schema";
+import { job, pkg, packageIssue, processingStat } from "./db/schema";
 import { buildZip, decompressSingleEntry } from "./scorm/zip-utils";
 import { fixPackage, type PackageIssue } from "./scorm/fixer";
 import { detectFileType, type DetectedFileType } from "./scorm/detect";
@@ -374,7 +374,31 @@ async function finishPackage(db: Db, message: Extract<ProcessingQueueMessage, { 
     );
   }
 
+  await recordProcessingStat(db, message.packageId, args.status, now);
   await updateJobCounters(db, message.jobId, args.status);
+}
+
+// One permanent row per finished package, for the Account/Admin
+// "documents processed" stats -- see processingStat's schema comment
+// for why this doesn't just read job/package directly (they get
+// purged by retention well before a month or quarter is up).
+async function recordProcessingStat(db: Db, packageId: string, status: "pass" | "fixed" | "failed", now: Date): Promise<void> {
+  const [row] = await db
+    .select({ ownerType: job.ownerType, ownerId: job.ownerId, sizeBytes: pkg.sizeBytes })
+    .from(pkg)
+    .innerJoin(job, eq(pkg.jobId, job.id))
+    .where(eq(pkg.id, packageId))
+    .limit(1);
+  if (!row || row.sizeBytes === null) return;
+
+  await db.insert(processingStat).values({
+    id: crypto.randomUUID(),
+    ownerType: row.ownerType,
+    ownerId: row.ownerId,
+    sizeBytes: row.sizeBytes,
+    status,
+    createdAt: now,
+  });
 }
 
 async function updateJobCounters(db: Db, jobId: string, packageStatus: "pass" | "fixed" | "failed") {

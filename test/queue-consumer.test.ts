@@ -1,11 +1,29 @@
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb } from "../src/lib/db/client";
-import { job, pkg, packageIssue, subscription, user } from "../src/lib/db/schema";
+import { job, pkg, packageIssue, processingStat, subscription, user } from "../src/lib/db/schema";
 import { buildZip, listZipEntries, strToU8 } from "../src/lib/scorm/zip-utils";
 import { processPackageMessage } from "../src/lib/queue-consumer";
 import { buildFixtureZip, corruptCompressedData } from "./scorm/helpers";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+// expandZipOfZips (queue-consumer.ts) really enqueues each expanded
+// package via env.PACKAGE_QUEUE.send() for the real deployed worker to
+// pick up later. In this test environment, wrangler.toml's real queue
+// consumer binding means miniflare actually delivers that message in
+// the background -- racing a test that (as every test below does)
+// immediately re-invokes processPackageMessage itself for each
+// expanded package, and sometimes landing after the test file's
+// isolated storage has already been torn down, which crashes the
+// whole run with an unrelated "Isolated storage failed" assertion.
+// Stubbed out since the real enqueue is always redundant here.
+function stubQueueSend(): void {
+  vi.spyOn(env.PACKAGE_QUEUE, "send").mockResolvedValue({} as QueueSendResponse);
+}
 
 async function seedJobAndPackage(
   tier: "free" | "pro" | "enterprise",
@@ -93,6 +111,7 @@ describe("processPackageMessage: zip-of-zips expansion", () => {
   });
 
   it("expands a bulk ZIP-of-ZIPs into one package per inner ZIP for a pro-tier owner", async () => {
+    stubQueueSend();
     const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", buildZipOfZips());
     const db = createDb(env.DB);
 
@@ -214,6 +233,7 @@ describe("processPackageMessage: corrupted/unreadable input", () => {
       "good.zip": [buildFixtureZip("valid-1.2", ["index.html"]), { level: 0 }],
     });
     const corruptedContainer = corruptCompressedData(container);
+    stubQueueSend();
     const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", corruptedContainer);
     const db = createDb(env.DB);
 
@@ -290,5 +310,53 @@ describe("processPackageMessage: translation-path rewrite gating", () => {
     const fixedBytes = new Uint8Array(await fixedObject!.arrayBuffer());
     const fixedNames = listZipEntries(fixedBytes).entries.map((e) => e.name);
     expect(fixedNames.sort()).toEqual(["en-us/narration.mp3", "imsmanifest.xml", "index.html"].sort());
+  });
+});
+
+describe("processPackageMessage: processing stats", () => {
+  // The Account/Admin "documents processed" stats read from
+  // processingStat, not job/package directly, because those get purged
+  // by retention -- this is the one place a row gets written, so every
+  // terminal outcome (pass, fixed, failed) must land one here.
+  it("records a processingStat row with the owner and size on a successful pass", async () => {
+    const bytes = buildFixtureZip("valid-1.2", ["index.html"]);
+    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("free", bytes);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
+    expect(pkgRow?.status).toBe("pass");
+
+    const stats = await db.select().from(processingStat).where(eq(processingStat.ownerId, ownerId));
+    expect(stats).toHaveLength(1);
+    expect(stats[0]).toMatchObject({ ownerType: "user", ownerId, sizeBytes: bytes.length, status: "pass" });
+  });
+
+  it("records a processingStat row for a failed package too (it still consumed real processing)", async () => {
+    const plainText = strToU8("not a recognized format");
+    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("free", plainText);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const stats = await db.select().from(processingStat).where(eq(processingStat.ownerId, ownerId));
+    expect(stats).toHaveLength(1);
+    expect(stats[0]).toMatchObject({ status: "failed", sizeBytes: plainText.length });
+  });
+
+  it("records one processingStat row per expanded package in a bulk ZIP-of-ZIPs, not one for the container", async () => {
+    stubQueueSend();
+    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("pro", buildZipOfZips());
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+    const packages = await db.select().from(pkg).where(eq(pkg.jobId, jobId));
+    for (const p of packages) {
+      await processPackageMessage({ type: "process", jobId, packageId: p.id, r2Key: p.r2KeyUpload }, env);
+    }
+
+    const stats = await db.select().from(processingStat).where(eq(processingStat.ownerId, ownerId));
+    expect(stats).toHaveLength(2); // the two inner packages -- never the container itself
   });
 });

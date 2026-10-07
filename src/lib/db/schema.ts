@@ -188,6 +188,22 @@ export const meteredUsageEvent = sqliteTable("metered_usage_event", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+// One row per package that finished processing (pass/fixed/failed),
+// across every tier -- the permanent record behind the "documents
+// processed / total size / average size" stats on Account and Admin.
+// Deliberately has no FK to job/package: those get deleted once a
+// job's retention window expires (see purgeExpiredJobs), sometimes
+// within hours on the free tier, which would silently erase monthly
+// or quarterly history if this table cascaded with them.
+export const processingStat = sqliteTable("processing_stat", {
+  id: text("id").primaryKey(),
+  ownerType: text("owner_type", { enum: ["user", "org"] }).notNull(),
+  ownerId: text("owner_id").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  status: text("status", { enum: ["pass", "fixed", "failed"] }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
 export const auditLog = sqliteTable("audit_log", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),

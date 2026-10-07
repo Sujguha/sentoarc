@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { PasswordInput } from "../components/PasswordInput";
+import { StatsPanel, type ProcessingStats } from "../components/StatsPanel";
 import { authClient, useSession } from "../lib/auth-client";
 import { button, card } from "../lib/ui";
 
@@ -26,6 +27,7 @@ const ICON_GEAR =
   "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z";
 const ICON_CARD = "M2 7h20M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7M6 15h4";
 const ICON_SHIELD = "M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3Z";
+const ICON_CHART = "M3 3v18h18 M8 17V10 M13 17V6 M18 17v-4";
 
 interface Usage {
   tier: string;
@@ -43,6 +45,7 @@ const checkoutParam = new URLSearchParams(window.location.search).get("checkout"
 export default function Account() {
   const { data: session } = useSession();
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [stats, setStats] = useState<ProcessingStats | null>(null);
   const [billingBusy, setBillingBusy] = useState<"month" | "year" | "portal" | number | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
 
@@ -58,6 +61,10 @@ export default function Account() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setUsage(data as Usage | null))
       .catch(() => setUsage(null));
+    fetch("/api/usage/stats")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setStats(data as ProcessingStats | null))
+      .catch(() => setStats(null));
   }, []);
 
   async function startCheckout(interval: "month" | "year") {
@@ -157,7 +164,7 @@ export default function Account() {
 
   return (
     <Layout>
-      <section className="mx-auto max-w-2xl px-6 py-16">
+      <section className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-bold text-slate-900">Account</h1>
         <p className="mt-2 text-slate-600">{session?.user.email}</p>
 
@@ -282,6 +289,14 @@ export default function Account() {
               {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}
             </div>
           )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <SectionIcon path={ICON_CHART} />
+            Usage stats
+          </h2>
+          <div className="mt-3">{stats && <StatsPanel stats={stats} />}</div>
         </div>
 
         <div className="mt-8">

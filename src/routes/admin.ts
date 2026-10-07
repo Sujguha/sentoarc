@@ -4,11 +4,21 @@ import { createDb } from "../lib/db/client";
 import { subscription } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { requireAdmin } from "../middleware/require-admin";
+import { computeProcessingStats } from "../lib/stats";
 import type { AppBindings } from "../types/hono";
 
 export const adminRoute = new Hono<AppBindings>();
 
 adminRoute.get("/ping", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
+
+// Platform-wide (no owner filter) processing stats -- same shape as
+// the personal GET /api/usage/stats, for the founder to see total
+// throughput across every user and org rather than just their own.
+adminRoute.get("/stats", requireAuth, requireAdmin, async (c) => {
+  const db = createDb(c.env.DB);
+  const stats = await computeProcessingStats(db, null, new Date());
+  return c.json(stats);
+});
 
 // Enterprise is sales-assisted, not self-serve -- a custom retention
 // window is something the founder sets per customer after a contract

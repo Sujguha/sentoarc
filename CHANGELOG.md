@@ -3,6 +3,45 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-10-07
+
+### Added
+
+- **Usage stats: documents processed, total size, average size, and a
+  monthly/quarterly trend.** Personal stats on Account
+  (`GET /api/usage/stats`) and platform-wide stats across every
+  user/org on Admin (`GET /api/admin/stats`), both rendered by a
+  shared `StatsPanel` (three stat tiles -- all time / this month / this
+  quarter -- plus a 6-month bar chart).
+  - New `processing_stat` table (migration `0007`) is written once per
+    finished package (pass, fixed, or failed) from `finishPackage` in
+    the queue consumer -- deliberately has **no FK to job/package**:
+    those rows get deleted once a job's retention window expires
+    (free tier can be a matter of hours), which would otherwise erase
+    monthly/quarterly history well before a month or quarter is up.
+  - `src/lib/stats.ts` (`computeProcessingStats`) buckets by this
+    month / this quarter / all time and a zero-filled 6-month trend,
+    scoped to one owner or (passing `owner: null`, admin only) across
+    every owner.
+  - A failed package still counts toward throughput -- it consumed
+    real processing and had a real file size, even though nothing was
+    delivered.
+
+### Fixed
+
+- A latent race in the zip-of-zips queue-consumer tests: `wrangler.toml`
+  configures a real queue consumer, so `expandZipOfZips`'s
+  `env.PACKAGE_QUEUE.send()` was actually delivered in the background
+  by miniflare while the test *also* manually re-invoked
+  `processPackageMessage` for the same packages -- occasionally racing
+  past the test file's teardown and crashing the whole suite with an
+  unrelated "Isolated storage failed" assertion. The extra query
+  `finishPackage` now does (to write the stat above) was enough added
+  latency to make this reliably reproduce. Fixed by stubbing
+  `PACKAGE_QUEUE.send` in the three tests that already re-process each
+  expanded package themselves, since the real enqueue was always
+  redundant there.
+
 ## [0.10.0] - 2026-10-07
 
 ### Changed
