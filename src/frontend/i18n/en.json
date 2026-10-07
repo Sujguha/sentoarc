@@ -18,7 +18,7 @@
     "hero": {
       "titleLine1": "Get your training content into WalkMe Learning Arc —",
       "titleLine2": "without the SCORM headaches",
-      "body": "Already have a SCORM package from SAP Enable Now? We validate it and fix what we safely can. Have a PDF, video, slide deck, or web page instead? We package it into a SCORM course for you. Either way, you get a package WalkMe Learning Arc will actually track correctly.",
+      "body": "Already have a SCORM package from SAP Enable Now? We validate it and fix what we safely can. Have a PDF, Word doc, slide deck, web page, image, audio, or video instead? We package it into a SCORM course for you. Either way, you get a package WalkMe Learning Arc will actually track correctly.",
       "tryFree": "Try it free",
       "seePricing": "See pricing"
     },
@@ -27,13 +27,13 @@
       "body1Prefix": "SAP Enable Now can export learning packages as SCORM, but WalkMe Learning Arc only accepts SCORM 1.2 ZIP files — and real-world exports commonly fail or track badly once imported: the wrong SCORM version, a missing or mis-cased launch file, and content marked as",
       "body1Middle": "instead of",
       "body1Suffix": "so completion is never recorded.",
-      "body2": "And plenty of useful training material was never SCORM at all — a PDF guide, a recorded walkthrough video, a slide deck, a one-off web page. Getting any of that into WalkMe Learning Arc normally means repackaging it by hand. SENtoArc does that part too."
+      "body2": "And plenty of useful training material was never SCORM at all — a PDF guide, a Word doc, a recorded walkthrough video, a slide deck, a one-off web page, a screenshot, or a narrated audio clip. Getting any of that into WalkMe Learning Arc normally means repackaging it by hand. SENtoArc does that part too."
     },
     "howItWorks": {
       "title": "How it works",
       "stepLabel": "Step {{number}}",
       "steps": [
-        { "title": "Upload", "body": "A SCORM ZIP from SEN, or a PDF, video, slide deck, or web page." },
+        { "title": "Upload", "body": "A SCORM ZIP from SEN, or a PDF, Word doc, video, slide deck, web page, image, or audio clip." },
         {
           "title": "Validate or package",
           "body": "SCORM gets checked for version, manifest, launch file, and scormtype issues. Everything else gets built into a fresh SCORM 1.2 course."
@@ -52,11 +52,11 @@
       "items": [
         {
           "q": "What exactly do I upload?",
-          "a": "A SCORM ZIP that SAP Enable Now itself exported (we don't read SEN's internal workspace format, only its SCORM output), or a PDF, MP4 video, PPTX, or HTML file to be packaged into SCORM from scratch."
+          "a": "A SCORM ZIP that SAP Enable Now itself exported (we don't read SEN's internal workspace format, only its SCORM output), or a PDF, Word document (.docx/.doc), PowerPoint (.pptx/.ppt), HTML page, image (PNG/JPG/GIF/SVG), audio file (MP3/WAV), or video (MP4/WebM/MOV) to be packaged into SCORM from scratch."
         },
         {
           "q": "Does PDF/video/slide packaging look the same as a real SCORM course?",
-          "a": "It's a simple, single-screen launch page that embeds your content and tracks completion — for video, automatically when it ends; for everything else, with a Mark Complete button. PowerPoint files currently link out for download rather than rendering slide-by-slide in the browser."
+          "a": "It's a simple, single-screen launch page that embeds your content and tracks completion — for video and audio, automatically when playback ends; for everything else, with a Mark Complete button. Word and PowerPoint files currently link out for download rather than rendering in the browser."
         },
         {
           "q": "Can every package be auto-fixed?",

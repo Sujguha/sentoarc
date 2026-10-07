@@ -18,7 +18,7 @@
     "hero": {
       "titleLine1": "Bringen Sie Ihre Schulungsinhalte in WalkMe Learning Arc —",
       "titleLine2": "ohne SCORM-Kopfschmerzen",
-      "body": "Haben Sie bereits ein SCORM-Paket aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Video, eine Präsentation oder eine Webseite? Wir verpacken es für Sie in einen SCORM-Kurs. So oder so erhalten Sie ein Paket, das WalkMe Learning Arc zuverlässig erfasst.",
+      "body": "Haben Sie bereits ein SCORM-Paket aus SAP Enable Now? Wir prüfen es und beheben, was sich sicher beheben lässt. Haben Sie stattdessen ein PDF, ein Word-Dokument, eine Präsentation, eine Webseite, ein Bild, eine Audio- oder eine Videodatei? Wir verpacken es für Sie in einen SCORM-Kurs. So oder so erhalten Sie ein Paket, das WalkMe Learning Arc zuverlässig erfasst.",
       "tryFree": "Kostenlos testen",
       "seePricing": "Preise ansehen"
     },
@@ -27,13 +27,13 @@
       "body1Prefix": "SAP Enable Now kann Lernpakete als SCORM exportieren, aber WalkMe Learning Arc akzeptiert nur SCORM-1.2-ZIP-Dateien — und reale Exporte schlagen häufig fehl oder werden nach dem Import schlecht erfasst: die falsche SCORM-Version, eine fehlende oder falsch geschriebene Startdatei und Inhalte, die als",
       "body1Middle": "statt als",
       "body1Suffix": "markiert sind, sodass der Abschluss nie erfasst wird.",
-      "body2": "Und vieles an nützlichem Schulungsmaterial war nie SCORM — ein PDF-Leitfaden, ein aufgezeichnetes Video, eine Präsentation, eine einmalige Webseite. Das normalerweise von Hand in WalkMe Learning Arc zu bringen, ist aufwendig. Auch das übernimmt SENtoArc."
+      "body2": "Und vieles an nützlichem Schulungsmaterial war nie SCORM — ein PDF-Leitfaden, ein Word-Dokument, ein aufgezeichnetes Video, eine Präsentation, eine einmalige Webseite, ein Screenshot oder eine Audioaufnahme. Das normalerweise von Hand in WalkMe Learning Arc zu bringen, ist aufwendig. Auch das übernimmt SENtoArc."
     },
     "howItWorks": {
       "title": "So funktioniert's",
       "stepLabel": "Schritt {{number}}",
       "steps": [
-        { "title": "Hochladen", "body": "Ein SCORM-ZIP aus SEN oder ein PDF, Video, eine Präsentation oder Webseite." },
+        { "title": "Hochladen", "body": "Ein SCORM-ZIP aus SEN oder ein PDF, Word-Dokument, Video, eine Präsentation, Webseite, ein Bild oder eine Audiodatei." },
         {
           "title": "Prüfen oder verpacken",
           "body": "SCORM wird auf Version, Manifest, Startdatei und Scormtype-Probleme geprüft. Alles andere wird zu einem neuen SCORM-1.2-Kurs verpackt."
@@ -52,11 +52,11 @@
       "items": [
         {
           "q": "Was genau lade ich hoch?",
-          "a": "Ein SCORM-ZIP, das SAP Enable Now selbst exportiert hat (wir lesen nicht das interne Arbeitsbereichsformat von SEN, nur dessen SCORM-Ausgabe), oder eine PDF-, MP4-, PPTX- oder HTML-Datei, die neu als SCORM verpackt wird."
+          "a": "Ein SCORM-ZIP, das SAP Enable Now selbst exportiert hat (wir lesen nicht das interne Arbeitsbereichsformat von SEN, nur dessen SCORM-Ausgabe), oder ein PDF, Word-Dokument (.docx/.doc), PowerPoint (.pptx/.ppt), eine HTML-Seite, ein Bild (PNG/JPG/GIF/SVG), eine Audiodatei (MP3/WAV) oder ein Video (MP4/WebM/MOV), das neu als SCORM verpackt wird."
         },
         {
           "q": "Sieht die PDF-/Video-/Präsentationsverpackung wie ein echter SCORM-Kurs aus?",
-          "a": "Es ist eine einfache Startseite mit einem Bildschirm, die Ihren Inhalt einbettet und den Abschluss erfasst — bei Video automatisch am Ende, sonst über eine „Abschließen“-Schaltfläche. PowerPoint-Dateien verlinken derzeit zum Download, statt Folie für Folie im Browser zu rendern."
+          "a": "Es ist eine einfache Startseite mit einem Bildschirm, die Ihren Inhalt einbettet und den Abschluss erfasst — bei Video und Audio automatisch am Ende der Wiedergabe, sonst über eine „Abschließen“-Schaltfläche. Word- und PowerPoint-Dateien verlinken derzeit zum Download, statt im Browser zu rendern."
         },
         {
           "q": "Kann jedes Paket automatisch behoben werden?",
