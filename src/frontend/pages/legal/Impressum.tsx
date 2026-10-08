@@ -43,14 +43,6 @@ export default function Impressum() {
           Deutschland
         </p>
 
-        <h2 className="mt-6 font-semibold text-slate-900">Streitschlichtung</h2>
-        <p className="mb-4">
-          [State here whether you participate in consumer dispute resolution proceedings before a consumer
-          arbitration board, and reference the current EU/national dispute-resolution information requirement
-          applicable at the time this page goes live — verify the exact wording required, since this has
-          changed over time.]
-        </p>
-
         <h2 className="mt-6 font-semibold text-slate-900">Haftungshinweis</h2>
         <p>
           SENtoArc works with content exported from SAP Enable Now and prepares it for import into WalkMe
