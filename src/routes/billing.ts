@@ -5,6 +5,7 @@ import { createDb } from "../lib/db/client";
 import { subscription, packPurchase } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { createStripeClient, createStripeCryptoProvider } from "../lib/billing/stripe-client";
+import { generateInvoicePdf, invoiceNumberFor } from "../lib/billing/invoice";
 import type { AppBindings } from "../types/hono";
 import type { Env } from "../types/env";
 
@@ -35,6 +36,37 @@ billingRoute.get("/purchases", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
   const purchases = await listPurchases(db, user.id);
   return c.json({ purchases });
+});
+
+// Generated on demand from the ledger row, not stored -- deterministic
+// (see invoiceNumberFor) so there's nothing to keep in sync if the
+// seller details in invoice.ts ever change.
+billingRoute.get("/purchases/:id/invoice", requireAuth, async (c) => {
+  const user = c.get("user");
+  const db = createDb(c.env.DB);
+
+  const [purchase] = await db
+    .select({
+      id: packPurchase.id,
+      packTier: packPurchase.packTier,
+      amountCents: packPurchase.amountCents,
+      createdAt: packPurchase.createdAt,
+    })
+    .from(packPurchase)
+    .where(and(eq(packPurchase.id, c.req.param("id")), eq(packPurchase.ownerType, "user"), eq(packPurchase.ownerId, user.id)))
+    .limit(1);
+
+  if (!purchase) {
+    return c.json({ error: "purchase_not_found" }, 404);
+  }
+
+  const pdfBytes = await generateInvoicePdf(purchase, user.email);
+  return new Response(new Blob([pdfBytes]), {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${invoiceNumberFor(purchase)}.pdf"`,
+    },
+  });
 });
 
 type PackTier = "project_pack" | "enterprise";

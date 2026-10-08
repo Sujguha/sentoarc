@@ -54,6 +54,8 @@ export default function Account() {
   const [purchases, setPurchases] = useState<Purchase[] | null>(null);
   const [billingBusy, setBillingBusy] = useState<"project_pack" | "enterprise" | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -96,6 +98,30 @@ export default function Account() {
     } catch {
       setBillingError(t("account.checkoutFailed"));
       setBillingBusy(null);
+    }
+  }
+
+  async function downloadInvoice(purchaseId: string) {
+    setInvoiceBusyId(purchaseId);
+    setInvoiceError(null);
+    try {
+      const res = await fetch(`/api/billing/purchases/${purchaseId}/invoice`);
+      if (!res.ok) {
+        setInvoiceError(t("account.invoiceFailed"));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const filenameMatch = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/);
+      a.download = filenameMatch?.[1] ?? "invoice.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setInvoiceError(t("account.invoiceFailed"));
+    } finally {
+      setInvoiceBusyId(null);
     }
   }
 
@@ -238,11 +264,21 @@ export default function Account() {
                         {p.objectsGranted === null ? t("account.objectsUnlimited") : t("account.objectsRemaining", { count: p.objectsGranted })}
                       </p>
                     </div>
-                    <span className="shrink-0 font-medium text-slate-700">€{(p.amountCents / 100).toFixed(2)}</span>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-medium text-slate-700">€{(p.amountCents / 100).toFixed(2)}</span>
+                      <button
+                        onClick={() => downloadInvoice(p.id)}
+                        disabled={invoiceBusyId !== null}
+                        className="text-indigo-700 underline transition-colors hover:text-indigo-900 disabled:opacity-50"
+                      >
+                        {invoiceBusyId === p.id ? t("account.invoiceGenerating") : t("account.downloadInvoice")}
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
+            {invoiceError && <p className="mt-3 text-sm text-red-600">{invoiceError}</p>}
           </div>
         </div>
 

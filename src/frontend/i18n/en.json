@@ -237,6 +237,9 @@
     "checkoutFailed": "Couldn't start checkout — please try again.",
     "billingHistory": "Billing history",
     "noPurchases": "No purchases yet.",
+    "downloadInvoice": "Download invoice",
+    "invoiceGenerating": "Generating…",
+    "invoiceFailed": "Couldn't generate invoice — please try again.",
     "usageStats": "Usage stats",
     "privacyAndCookies": "Privacy & Cookies",
     "accountDeletionNote": "Account deletion lands in a later phase."

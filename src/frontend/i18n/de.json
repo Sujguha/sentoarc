@@ -237,6 +237,9 @@
     "checkoutFailed": "Checkout konnte nicht gestartet werden — bitte erneut versuchen.",
     "billingHistory": "Zahlungsverlauf",
     "noPurchases": "Noch keine Käufe.",
+    "downloadInvoice": "Rechnung herunterladen",
+    "invoiceGenerating": "Wird erstellt…",
+    "invoiceFailed": "Rechnung konnte nicht erstellt werden — bitte erneut versuchen.",
     "usageStats": "Nutzungsstatistik",
     "privacyAndCookies": "Datenschutz & Cookies",
     "accountDeletionNote": "Die Kontolöschung folgt in einer späteren Phase."

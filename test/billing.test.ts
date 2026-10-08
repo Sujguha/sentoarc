@@ -305,3 +305,10 @@ describe("GET /api/billing/purchases", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("GET /api/billing/purchases/:id/invoice", () => {
+  it("requires auth", async () => {
+    const res = await SELF.fetch("https://example.com/api/billing/purchases/some-id/invoice");
+    expect(res.status).toBe(401);
+  });
+});
