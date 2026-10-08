@@ -23,11 +23,6 @@ export default function Impressum() {
         <h2 className="mt-6 font-semibold text-slate-900">Kontakt</h2>
         <p className="mb-4">E-Mail: sujoy.guha@mnet-mail.de</p>
 
-        <h2 className="mt-6 font-semibold text-slate-900">Umsatzsteuer-ID</h2>
-        <p className="mb-4">
-          [Your VAT identification number per § 27a UStG — not yet issued; omit this section until you have one]
-        </p>
-
         <h2 className="mt-6 font-semibold text-slate-900">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
         <p className="mb-4">
           Sujoy Guha Consulting
