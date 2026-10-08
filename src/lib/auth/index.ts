@@ -73,6 +73,14 @@ export function createAuth(env: Env) {
         // provisioned can still manage it day to day (invite teammates,
         // change roles) through the rest of this same plugin.
         allowUserToCreateOrganization: (user) => isFounderEmail(env, user.email),
+        // better-auth's own default for this is already 100 -- set it
+        // explicitly rather than relying on that, so the cap is a
+        // deliberate decision visible in our own config, not an
+        // implicit library default that could silently change.
+        // Enforced on both the invite-creation and member-add paths
+        // (whichever a given addition goes through), surfacing
+        // "Organization membership limit reached" to the inviter.
+        membershipLimit: 100,
         sendInvitationEmail: async (data) => {
           const url = `${env.APP_BASE_URL}/accept-invitation?id=${data.invitation.id}`;
           await sendEmail(env.SENDGRID_API_KEY, {
