@@ -235,6 +235,8 @@
     "buyEnterprise": "Buy Enterprise Migration (€1,999, unlimited)",
     "redirecting": "Redirecting…",
     "checkoutFailed": "Couldn't start checkout — please try again.",
+    "billingHistory": "Billing history",
+    "noPurchases": "No purchases yet.",
     "usageStats": "Usage stats",
     "privacyAndCookies": "Privacy & Cookies",
     "accountDeletionNote": "Account deletion lands in a later phase."

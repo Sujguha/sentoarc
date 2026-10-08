@@ -235,6 +235,8 @@
     "buyEnterprise": "Enterprise Migration kaufen (1.999 €, unbegrenzt)",
     "redirecting": "Weiterleitung…",
     "checkoutFailed": "Checkout konnte nicht gestartet werden — bitte erneut versuchen.",
+    "billingHistory": "Zahlungsverlauf",
+    "noPurchases": "Noch keine Käufe.",
     "usageStats": "Nutzungsstatistik",
     "privacyAndCookies": "Datenschutz & Cookies",
     "accountDeletionNote": "Die Kontolöschung folgt in einer späteren Phase."

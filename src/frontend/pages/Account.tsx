@@ -36,6 +36,14 @@ interface Usage {
   objectsRemaining: number | null;
 }
 
+interface Purchase {
+  id: string;
+  packTier: "project_pack" | "enterprise";
+  objectsGranted: number | null;
+  amountCents: number;
+  createdAt: string;
+}
+
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
 
 export default function Account() {
@@ -43,6 +51,7 @@ export default function Account() {
   const { data: session } = useSession();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [stats, setStats] = useState<ProcessingStats | null>(null);
+  const [purchases, setPurchases] = useState<Purchase[] | null>(null);
   const [billingBusy, setBillingBusy] = useState<"project_pack" | "enterprise" | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
 
@@ -62,6 +71,10 @@ export default function Account() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setStats(data as ProcessingStats | null))
       .catch(() => setStats(null));
+    fetch("/api/billing/purchases")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setPurchases((data as { purchases: Purchase[] } | null)?.purchases ?? []))
+      .catch(() => setPurchases([]));
   }, []);
 
   async function buyPack(packTier: "project_pack" | "enterprise") {
@@ -202,6 +215,35 @@ export default function Account() {
               {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}
             </div>
           )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <SectionIcon path={ICON_CARD} />
+            {t("account.billingHistory")}
+          </h2>
+          <div className={`mt-3 ${card()}`}>
+            {purchases === null ? null : purchases.length === 0 ? (
+              <p className="text-sm text-slate-500">{t("account.noPurchases")}</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {purchases.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-4 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">
+                        {t(`account.tierNames.${p.packTier}`, { defaultValue: p.packTier })}
+                      </p>
+                      <p className="text-slate-500">
+                        {new Date(p.createdAt).toLocaleString()} ·{" "}
+                        {p.objectsGranted === null ? t("account.objectsUnlimited") : t("account.objectsRemaining", { count: p.objectsGranted })}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-medium text-slate-700">€{(p.amountCents / 100).toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="mt-8">

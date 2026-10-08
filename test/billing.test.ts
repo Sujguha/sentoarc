@@ -2,6 +2,7 @@ import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/lib/db/client";
 import { subscription, packPurchase } from "../src/lib/db/schema";
+import { listPurchases } from "../src/routes/billing";
 import { eq } from "drizzle-orm";
 
 const WEBHOOK_SECRET = "not-a-real-secret--vitest-placeholder";
@@ -239,6 +240,68 @@ describe("POST /api/billing/checkout-pack", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ packTier: "project_pack" }),
     });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("listPurchases", () => {
+  it("returns only this owner's purchases, newest first", async () => {
+    const db = createDb(env.DB);
+    const ownerId = "test-user-list-1";
+    const otherOwnerId = "test-user-list-2";
+    const older = new Date(Date.now() - 60_000);
+    const newer = new Date();
+
+    await db.insert(packPurchase).values([
+      {
+        id: crypto.randomUUID(),
+        ownerType: "user",
+        ownerId,
+        packTier: "project_pack",
+        objectsGranted: 100,
+        amountCents: 49900,
+        stripeCheckoutSessionId: "cs_list_older",
+        createdAt: older,
+      },
+      {
+        id: crypto.randomUUID(),
+        ownerType: "user",
+        ownerId,
+        packTier: "enterprise",
+        objectsGranted: null,
+        amountCents: 199900,
+        stripeCheckoutSessionId: "cs_list_newer",
+        createdAt: newer,
+      },
+      {
+        id: crypto.randomUUID(),
+        ownerType: "user",
+        ownerId: otherOwnerId,
+        packTier: "project_pack",
+        objectsGranted: 100,
+        amountCents: 49900,
+        stripeCheckoutSessionId: "cs_list_other_owner",
+        createdAt: newer,
+      },
+    ]);
+
+    const result = await listPurchases(db, ownerId);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ packTier: "enterprise", objectsGranted: null, amountCents: 199900 });
+    expect(result[1]).toMatchObject({ packTier: "project_pack", objectsGranted: 100, amountCents: 49900 });
+  });
+
+  it("returns an empty list for an owner with no purchases", async () => {
+    const db = createDb(env.DB);
+    const result = await listPurchases(db, crypto.randomUUID());
+    expect(result).toEqual([]);
+  });
+});
+
+describe("GET /api/billing/purchases", () => {
+  it("requires auth", async () => {
+    const res = await SELF.fetch("https://example.com/api/billing/purchases");
     expect(res.status).toBe(401);
   });
 });

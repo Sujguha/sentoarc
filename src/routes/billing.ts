@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import type Stripe from "stripe";
 import { createDb } from "../lib/db/client";
 import { subscription, packPurchase } from "../lib/db/schema";
@@ -9,6 +9,33 @@ import type { AppBindings } from "../types/hono";
 import type { Env } from "../types/env";
 
 export const billingRoute = new Hono<AppBindings>();
+
+// Purchase history for the Account page's billing section -- the
+// packPurchase ledger is also what makes webhook delivery idempotent
+// (see grantPackPurchase), so this doubles as a way for a customer (or
+// us, debugging a report of "I paid but don't see it") to tell at a
+// glance whether a payment actually got credited: if it went through on
+// Stripe's side but isn't here, the webhook never ran.
+export async function listPurchases(db: ReturnType<typeof createDb>, ownerId: string) {
+  return db
+    .select({
+      id: packPurchase.id,
+      packTier: packPurchase.packTier,
+      objectsGranted: packPurchase.objectsGranted,
+      amountCents: packPurchase.amountCents,
+      createdAt: packPurchase.createdAt,
+    })
+    .from(packPurchase)
+    .where(and(eq(packPurchase.ownerType, "user"), eq(packPurchase.ownerId, ownerId)))
+    .orderBy(desc(packPurchase.createdAt));
+}
+
+billingRoute.get("/purchases", requireAuth, async (c) => {
+  const user = c.get("user");
+  const db = createDb(c.env.DB);
+  const purchases = await listPurchases(db, user.id);
+  return c.json({ purchases });
+});
 
 type PackTier = "project_pack" | "enterprise";
 
