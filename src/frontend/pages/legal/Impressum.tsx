@@ -11,13 +11,13 @@ export default function Impressum() {
         <p className="mb-4">Angaben gemäß § 5 TMG:</p>
 
         <p className="mb-4">
-          [Your full legal name or company name]
+          Sujoy Guha Consulting
           <br />
-          [Street and house number]
+          Situlistraße 35
           <br />
-          [Postal code and city]
+          80939 München
           <br />
-          [Country]
+          Deutschland
         </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Kontakt</h2>
@@ -29,7 +29,7 @@ export default function Impressum() {
 
         <h2 className="mt-6 font-semibold text-slate-900">Umsatzsteuer-ID</h2>
         <p className="mb-4">
-          [Your VAT identification number per § 27a UStG, if you have one — omit this section if you don't]
+          [Your VAT identification number per § 27a UStG — not yet issued; omit this section until you have one]
         </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Handelsregister</h2>
@@ -39,7 +39,15 @@ export default function Impressum() {
         </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
-        <p className="mb-4">[Your full legal name and address, same as above, if this section is required for your setup]</p>
+        <p className="mb-4">
+          Sujoy Guha Consulting
+          <br />
+          Situlistraße 35
+          <br />
+          80939 München
+          <br />
+          Deutschland
+        </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Streitschlichtung</h2>
         <p className="mb-4">
