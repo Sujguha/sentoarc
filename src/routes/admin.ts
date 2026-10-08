@@ -68,7 +68,8 @@ adminRoute.put("/subscriptions/:ownerType/:ownerId/retention", requireAuth, requ
 // (see allowUserToCreateOrganization in auth/index.ts) would otherwise
 // be stuck on the implicit "free" fallback (resolvePlanTierFor) forever.
 // The founder calls this after a sales conversation, same spirit as the
-// retention override above; also handy for comping a Pro/metered plan.
+// retention override above; also handy for comping a Project Pack/
+// Enterprise plan without a real Stripe payment.
 adminRoute.put("/subscriptions/:ownerType/:ownerId/tier", requireAuth, requireAdmin, async (c) => {
   const ownerType = c.req.param("ownerType");
   const ownerId = c.req.param("ownerId");
@@ -78,8 +79,8 @@ adminRoute.put("/subscriptions/:ownerType/:ownerId/tier", requireAuth, requireAd
 
   const body = await c.req.json<{ tier?: string }>().catch(() => null);
   const tier = body?.tier;
-  if (tier !== "free" && tier !== "pro" && tier !== "enterprise" && tier !== "metered") {
-    return c.json({ error: "invalid_tier", allowed: ["free", "pro", "enterprise", "metered"] }, 400);
+  if (tier !== "free" && tier !== "project_pack" && tier !== "enterprise") {
+    return c.json({ error: "invalid_tier", allowed: ["free", "project_pack", "enterprise"] }, 400);
   }
 
   const db = createDb(c.env.DB);

@@ -3,6 +3,46 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.15.0] - 2026-10-08
+
+### Changed
+
+- **Pricing pivot: subscriptions/pay-per-MB → one-time object packs.**
+  Replaced the Free/Metered/Pro/Enterprise lineup with Free (Proof),
+  Project Pack, and Enterprise Migration:
+  - **Free / Proof** (€0): 3 objects, lifetime, not monthly. "Object" =
+    one converted file/package -- the same granularity the app already
+    tracked per `package` row, so no new counting concept.
+  - **Project Pack** (€499 one-time): 100 objects. Buying another pack
+    stacks on top of whatever's left rather than replacing it.
+  - **Enterprise Migration** (€1,999 one-time): unlimited objects, plus
+    the existing org features (roles, shared projects, audit log,
+    configurable retention). "Custom mapping" and "priority support"
+    are sales talking points for now, not new code.
+  - Both paid packs are self-serve via Stripe Checkout (`mode:
+    "payment"`, inline `price_data` -- no pre-created Stripe Prices,
+    no subscriptions). The webhook grants objects idempotently: a new
+    `pack_purchase` ledger row (keyed on Stripe's checkout session id)
+    is what a redelivered webhook event can't duplicate.
+  - **Bulk upload is open to every tier now**, including Free -- "1
+    group" fits inside the same 3-object budget as 3 separate files.
+    A ZIP-of-ZIPs container's own upload still costs 1 object like any
+    upload, but since the container itself is never a real deliverable,
+    that charge is refunded before each inner package is charged for
+    real; if the quota runs out partway through expanding one, the rest
+    are left unexpanded rather than created unaffordably.
+  - CSV export and the translation-path rewrite stay Project Pack/
+    Enterprise only.
+  - `subscription.tier`'s enum narrowed to `free`/`project_pack`/
+    `enterprise`; a new `objects_remaining` column replaces the old
+    free-upload counter and prepaid-cents balance as the single quota
+    mechanism for every non-Enterprise tier (migration `0009`, which
+    also carries forward any existing Pro/Metered subscriber onto a
+    fresh 100-object Project Pack grant rather than silently dropping
+    them to Free). The old `balance_cents` column and
+    `metered_usage_event` table are left in place, unused, rather than
+    dropped in this same change.
+
 ## [0.14.0] - 2026-10-07
 
 ### Added

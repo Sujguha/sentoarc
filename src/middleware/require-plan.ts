@@ -62,7 +62,7 @@ export const resolvePlanTier = createMiddleware<AppBindings>(async (c, next) => 
   await next();
 });
 
-export function requirePlan(allowed: Array<"free" | "pro" | "enterprise" | "metered">) {
+export function requirePlan(allowed: Array<"free" | "project_pack" | "enterprise">) {
   return createMiddleware<AppBindings>(async (c, next) => {
     const tier = c.get("planTier");
     if (!allowed.includes(tier)) {

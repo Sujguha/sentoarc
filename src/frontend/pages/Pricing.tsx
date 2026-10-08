@@ -3,14 +3,13 @@ import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
 import { button } from "../lib/ui";
 
-const TIER_IDS = ["free", "metered", "pro", "enterprise"] as const;
+const TIER_IDS = ["free", "project_pack", "enterprise"] as const;
 type TierId = (typeof TIER_IDS)[number];
 
 const TIER_META: Record<TierId, { price: string; to: string; highlighted?: boolean }> = {
   free: { price: "€0", to: "/sign-up" },
-  metered: { price: "€0.01", to: "/sign-up" },
-  pro: { price: "€19", to: "/sign-up", highlighted: true },
-  enterprise: { price: "Contact us", to: "/#contact" },
+  project_pack: { price: "€499", to: "/sign-up", highlighted: true },
+  enterprise: { price: "€1,999", to: "/sign-up" },
 };
 
 export default function Pricing() {
@@ -20,7 +19,7 @@ export default function Pricing() {
     <Layout>
       <section className="mx-auto max-w-6xl px-6 py-16">
         <h1 className="text-center text-3xl font-bold text-slate-900">{t("pricing.title")}</h1>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-6 sm:grid-cols-3">
           {TIER_IDS.map((id) => {
             const meta = TIER_META[id];
             const features = t(`pricing.tiers.${id}.features`, { returnObjects: true }) as string[];

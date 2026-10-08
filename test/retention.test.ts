@@ -87,14 +87,14 @@ describe("computeRetentionExpiresAt", () => {
     expect(expiresAt.getTime()).toBe(expectedMs);
   });
 
-  it("pro tier: now + PRO_RETENTION_DAYS days", () => {
-    const expiresAt = computeRetentionExpiresAt("pro", env, now);
+  it("project_pack tier: now + PRO_RETENTION_DAYS days", () => {
+    const expiresAt = computeRetentionExpiresAt("project_pack", env, now);
     const expectedMs = now.getTime() + Number(env.PRO_RETENTION_DAYS) * 24 * 60 * 60 * 1000;
     expect(expiresAt.getTime()).toBe(expectedMs);
   });
 
-  it("enterprise tier with no override: same window as pro (no separate enterprise retention var)", () => {
-    const proExpiry = computeRetentionExpiresAt("pro", env, now);
+  it("enterprise tier with no override: same window as project_pack (no separate enterprise retention var)", () => {
+    const proExpiry = computeRetentionExpiresAt("project_pack", env, now);
     const entExpiry = computeRetentionExpiresAt("enterprise", env, now);
     expect(entExpiry.getTime()).toBe(proExpiry.getTime());
   });

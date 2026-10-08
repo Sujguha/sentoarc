@@ -136,11 +136,14 @@ export default function AppShell() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([]);
-  const [tier, setTier] = useState<"free" | "pro" | "enterprise" | "metered">("free");
-  const [balanceCents, setBalanceCents] = useState<number | null>(null);
+  const [tier, setTier] = useState<"free" | "project_pack" | "enterprise">("free");
+  const [objectsRemaining, setObjectsRemaining] = useState<number | null>(null);
   const [workspace, setWorkspace] = useState<ActiveWorkspace | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isProOrEnterprise = tier === "pro" || tier === "enterprise" || tier === "metered";
+  // CSV export and translation-path rewrite stay Project Pack/Enterprise
+  // only; bulk upload (multiple files at once) is open to every tier now,
+  // just limited by the usual object quota.
+  const canExportCsv = tier === "project_pack" || tier === "enterprise";
   const isViewer = workspace?.role === "viewer";
 
   const INPUT_FORMAT_LABELS: Record<string, string> = {
@@ -167,9 +170,9 @@ export default function AppShell() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data) return;
-        const usage = data as { tier: typeof tier; balanceCents: number | null };
+        const usage = data as { tier: typeof tier; objectsRemaining: number | null };
         setTier(usage.tier);
-        setBalanceCents(usage.balanceCents);
+        setObjectsRemaining(usage.objectsRemaining);
       })
       .catch(() => {});
   }
@@ -317,12 +320,14 @@ export default function AppShell() {
           </p>
         )}
 
-        {tier === "metered" && balanceCents !== null && (
+        {tier !== "enterprise" && objectsRemaining !== null && (
           <p className="mt-3 text-sm text-slate-600">
-            {t("appShell.balance", { amount: `€${(balanceCents / 100).toFixed(2)}` })}{" "}
-            <Link to="/account" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
-              {t("appShell.topUp")}
-            </Link>
+            {t("appShell.objectsRemaining", { count: objectsRemaining })}{" "}
+            {objectsRemaining < 1 && (
+              <Link to="/account" className="text-indigo-700 underline transition-colors hover:text-indigo-900">
+                {t("appShell.buyMore")}
+              </Link>
+            )}
           </p>
         )}
 
@@ -341,20 +346,20 @@ export default function AppShell() {
                 id="file-input"
                 type="file"
                 accept={ALLOWED_EXTENSIONS.join(",")}
-                multiple={isProOrEnterprise}
+                multiple
                 className="hidden"
                 onChange={handleFileChange}
                 disabled={uploading}
               />
               <label htmlFor="file-input" className={`cursor-pointer ${button("primary", "lg")}`}>
-                {uploading ? t("appShell.uploading") : isProOrEnterprise ? t("appShell.chooseFiles") : t("appShell.chooseFile")}
+                {uploading ? t("appShell.uploading") : t("appShell.chooseFiles")}
               </label>
             </>
           )}
           {!isViewer && (
             <p className="mt-2 text-xs text-slate-400">
               {t("appShell.acceptedTypes")}
-              {isProOrEnterprise ? t("appShell.hintBulk") : t("appShell.hintSingle")}
+              {t("appShell.hintBulk")}
             </p>
           )}
           {selectedFile && !uploadError && (
@@ -369,7 +374,7 @@ export default function AppShell() {
           <div className="mt-8">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">{t("appShell.migrationReport")}</h2>
-              {isProOrEnterprise && (
+              {canExportCsv && (
                 <a
                   href={`/api/jobs/${jobDetail.job.id}/export.csv`}
                   className="text-sm font-medium text-indigo-700 transition-colors hover:text-indigo-900 hover:underline"

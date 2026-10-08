@@ -48,7 +48,7 @@ async function seedBalance(ownerId: string, balanceCents: number): Promise<void>
     id: crypto.randomUUID(),
     ownerType: "user",
     ownerId,
-    tier: "metered",
+    tier: "project_pack",
     status: "active",
     balanceCents,
     seats: 1,

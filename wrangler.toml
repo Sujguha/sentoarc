@@ -34,7 +34,10 @@ dead_letter_queue = "sentoarc-package-processing-dlq"
 crons = ["0 * * * *"]
 
 [vars]
-FREE_UPLOAD_LIMIT = "5"
+# Lifetime, not monthly -- matches the "3 objects (1 group / 3 files)"
+# free tier on the pricing page. See migration 0009's `objects_remaining`
+# default, which this is meant to match for a fresh signup.
+FREE_OBJECT_LIMIT = "3"
 # Matches WalkMe Learning Arc's own documented limits: 200MB standard
 # document/asset upload, 500MB for video. (Learning Arc also caps video
 # at 60 minutes; we don't parse video duration, so that half of the
@@ -47,16 +50,12 @@ ADMIN_EMAILS = "sujoy.guha2@gmail.com"
 APP_BASE_URL = "https://sentoarc.sujoy-guha2.workers.dev"
 SENDGRID_FROM_EMAIL = "sujoy.guha2@gmail.com"
 SENDGRID_FROM_NAME = "SENtoArc"
-# Pro pricing: EUR 19/month, EUR 190/year (Stripe Sandbox). Not secret:
-# Stripe price IDs carry no account access on their own, only the
-# secret key does.
-STRIPE_PRICE_ID_MONTHLY = "price_1UNV3hCvTE3LMxwL7Lfq9VnM"
-STRIPE_PRICE_ID_YEARLY = "price_1UNV3iCvTE3LMxwLnfl8hPTt"
-# Pay-as-you-go: prepaid balance, not a Stripe subscription -- topped up
-# via a one-time Checkout payment for whatever amount the customer picks
-# (no pre-created Stripe Price needed), deducted per upload before
-# processing starts. This is the price per MB processed, in cents.
-METERED_UNIT_PRICE_CENTS = "1"
+# One-time packs (Stripe Sandbox), self-serve via Checkout -- no
+# subscriptions, no pre-created Stripe Prices (inline price_data at
+# checkout time instead, same as the old pay-as-you-go top-up did).
+PROJECT_PACK_PRICE_CENTS = "49900"
+PROJECT_PACK_OBJECTS = "100"
+ENTERPRISE_PACK_PRICE_CENTS = "199900"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET

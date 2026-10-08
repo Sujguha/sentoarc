@@ -44,7 +44,7 @@
     },
     "pricingTeaser": {
       "title": "Einfache Preise",
-      "body": "Starten Sie kostenlos mit einer Handvoll Paketen. Upgraden Sie auf Pro für Massenmigrationen, oder sprechen Sie mit uns über Enterprise bei mehreren Teams.",
+      "body": "Testen Sie es kostenlos an ein paar Dateien, ganz ohne Risiko. Kaufen Sie ein Project Pack für eine einmalige Migration, oder Enterprise Migration für einen vollständigen SAP-Katalog mit mehreren Teams.",
       "link": "Alle Preise ansehen →"
     },
     "faq": {
@@ -86,49 +86,38 @@
     "title": "Preise",
     "tiers": {
       "free": {
-        "name": "Free",
-        "description": "Zum Ausprobieren mit einer Handvoll Paketen.",
-        "features": ["Bis zu 5 Paket-Uploads insgesamt", "Nur einzelne Pakete", "Fertiges ZIP zum Download", "Bericht auf dem Bildschirm"],
-        "cta": "Kostenlos registrieren"
+        "name": "Free / Proof",
+        "description": "Prüfen Sie risikofrei, ob die Ausgabe in Ihrem WalkMe-Arc-Tenant einwandfrei läuft.",
+        "features": ["Bis zu 3 Objekte (1 Gruppe oder 3 einzelne Dateien)", "Massen-Upload inklusive", "Bericht auf dem Bildschirm"],
+        "cta": "Kostenlos testen"
       },
-      "metered": {
-        "name": "Metered",
-        "cadence": "pro verarbeitetem MB (z. B. 10 MB ≈ 0,10 €)",
-        "description": "Pay-as-you-go — kein Abo, keine Verpflichtung.",
+      "project_pack": {
+        "name": "Project Pack",
+        "cadence": "einmalig",
+        "description": "Für kleine bis mittlere Teams mit einem konkreten Katalog zum Migrieren.",
         "features": [
-          "Kein Limit bei der Anzahl der Uploads",
+          "Bis zu 100 Objekte",
+          "Selbstbedienung: Upload & Download",
           "Massen-Upload (mehrere ZIPs oder ein ZIP aus ZIPs)",
           "CSV-Berichtsexport",
           "Übersetzungspfad-Korrektur",
           "30 Tage Auftragsverlauf"
         ],
-        "cta": "Pay-as-you-go starten"
-      },
-      "pro": {
-        "name": "Pro",
-        "cadence": "pro Nutzer / Monat, monatlich oder jährlich abgerechnet",
-        "description": "Für laufende Migrationen.",
-        "features": [
-          "Unbegrenzte Uploads",
-          "Massen-Upload (mehrere ZIPs oder ein ZIP aus ZIPs)",
-          "CSV-Berichtsexport",
-          "Übersetzungspfad-Korrektur",
-          "30 Tage Auftragsverlauf"
-        ],
-        "cta": "Pro starten"
+        "cta": "Project Pack kaufen"
       },
       "enterprise": {
-        "name": "Enterprise",
-        "price": "Auf Anfrage",
-        "cadence": "pro Unternehmen",
-        "description": "Für mehrere Teams, die gemeinsam migrieren.",
+        "name": "Enterprise Migration",
+        "cadence": "einmalig",
+        "description": "Für die vollständige Katalog-Migration einer großen SAP-Organisation.",
         "features": [
+          "Unbegrenzte Objekte",
+          "Individuelles Mapping & bevorzugter Support",
           "Mehrere Nutzer mit Rollen (Admin / Editor / Betrachter)",
           "Gemeinsame Migrationsprojekte",
           "Vollständiges Audit-Log",
           "Konfigurierbare Datenaufbewahrung"
         ],
-        "cta": "Vertrieb kontaktieren"
+        "cta": "Enterprise Migration kaufen"
       }
     }
   },
@@ -163,16 +152,14 @@
     "uploadingAsPrefix": "Hochladen als",
     "uploadingAsSuffix": "({{role}}) — gemeinsam mit Ihrem Team genutzt.",
     "switchWorkspace": "Arbeitsbereich wechseln",
-    "balance": "Guthaben: {{amount}}",
-    "topUp": "Aufladen",
+    "objectsRemaining": "{{count}} Objekte in Ihrem Tarif verbleibend.",
+    "buyMore": "Mehr kaufen",
     "viewerNotice": "Betrachter können die Uploads dieses Teams sehen, aber keine neuen hinzufügen.",
     "switchToPersonal": "Zu Ihrem persönlichen Arbeitsbereich wechseln",
     "toUploadOwnPackages": "um eigene Pakete hochzuladen.",
     "chooseFiles": "Datei(en) auswählen",
-    "chooseFile": "Datei auswählen",
     "uploading": "Wird hochgeladen…",
     "hintBulk": " — wählen Sie mehrere Dateien oder ein einzelnes ZIP mit mehreren SCORM-Paket-ZIPs, um sie als ein Batch zu verarbeiten.",
-    "hintSingle": ". Upgraden Sie auf Pro, um mehrere Pakete auf einmal hochzuladen.",
     "acceptedTypes": "SCORM-ZIP, PDF, Word, PowerPoint, HTML, Bilder, Audio und Video",
     "filesSelected": "{{count}} Dateien ausgewählt",
     "migrationReport": "Migrationsbericht",
@@ -204,15 +191,15 @@
     },
     "errors": {
       "unsupported_file_type": "Bitte wählen Sie eine SCORM-ZIP-, PDF-, Word-, PowerPoint-, HTML-, Bild-, Audio- oder Videodatei.",
-      "free_limit_reached": "Sie haben alle kostenlosen Uploads aufgebraucht. Upgraden Sie auf Pro für unbegrenzte Uploads.",
+      "object_quota_exhausted": "Sie haben keine Objekte mehr in Ihrem Tarif. Kaufen Sie ein Paket, um fortzufahren.",
+      "object_quota_exceeded": "Dieser Stapel enthält mehr Dateien, als Sie Objekte übrig haben. Kaufen Sie ein Paket oder teilen Sie ihn in kleinere Stapel auf.",
       "package_too_large": "Diese Datei ist für das aktuelle Tariflimit zu groß.",
       "size_bytes_required": "Dateigröße konnte nicht gelesen werden — bitte erneut versuchen.",
       "already_uploaded": "Dieser Upload wurde bereits übermittelt.",
       "empty_upload": "Die Datei scheint leer zu sein.",
       "files_required": "Bitte wählen Sie mindestens eine Datei.",
       "too_many_files": "Zu viele Dateien in einem Massen-Upload — bitte in kleinere Stapel aufteilen.",
-      "plan_upgrade_required": "Massen-Upload (mehrere Dateien gleichzeitig) erfordert einen Pro-Tarif.",
-      "insufficient_balance": "Ihr Guthaben reicht für diesen Upload nicht aus — bitte auf der Konto-Seite aufladen.",
+      "plan_upgrade_required": "Diese Funktion erfordert einen Project-Pack- oder Enterprise-Migration-Tarif.",
       "generic": "Etwas ist schiefgelaufen — bitte versuchen Sie es erneut.",
       "connection": "Upload fehlgeschlagen — bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
     }
@@ -235,24 +222,16 @@
     "plansAndPricing": "Tarife & Preise",
     "planLabel": "Tarif:",
     "tierNames": {
-      "free": "free",
-      "pro": "pro",
-      "enterprise": "enterprise",
-      "metered": "metered"
+      "free": "free / proof",
+      "project_pack": "project pack",
+      "enterprise": "enterprise migration"
     },
-    "freeUploadsUsed": "{{used}} / {{limit}} kostenlose Uploads verwendet",
-    "balance": "Guthaben: {{amount}}",
-    "mbProcessedLifetime": " · {{count}} MB insgesamt verarbeitet",
-    "prepaidNote": " — Guthaben, pro Upload abgebucht, kein Abo",
-    "upgradeMonthly": "Auf Pro upgraden (monatlich)",
-    "upgradeYearly": "Auf Pro upgraden (jährlich)",
+    "objectsRemaining": "{{count}} Objekte verbleibend",
+    "objectsUnlimited": "Unbegrenzte Objekte",
+    "buyProjectPack": "Project Pack kaufen (499 €, 100 Objekte)",
+    "buyEnterprise": "Enterprise Migration kaufen (1.999 €, unbegrenzt)",
     "redirecting": "Weiterleitung…",
-    "topUpPromptFree": "Oder Pay-as-you-go — Guthaben aufladen, kein Abo:",
-    "topUpPromptMetered": "Guthaben aufladen:",
-    "manageBilling": "Abrechnung verwalten",
-    "billingNotConfigured": "Dieser Tarif ist noch nicht selbst buchbar — bitte später erneut versuchen.",
     "checkoutFailed": "Checkout konnte nicht gestartet werden — bitte erneut versuchen.",
-    "billingPortalFailed": "Abrechnung konnte nicht geöffnet werden — bitte erneut versuchen.",
     "usageStats": "Nutzungsstatistik",
     "privacyAndCookies": "Datenschutz & Cookies",
     "accountDeletionNote": "Die Kontolöschung folgt in einer späteren Phase."

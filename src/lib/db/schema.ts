@@ -94,7 +94,7 @@ export const subscription = sqliteTable("subscription", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePriceId: text("stripe_price_id"),
-  tier: text("tier", { enum: ["free", "pro", "enterprise", "metered"] }).notNull().default("free"),
+  tier: text("tier", { enum: ["free", "project_pack", "enterprise"] }).notNull().default("free"),
   status: text("status").notNull().default("active"),
   currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
   seats: integer("seats").notNull().default(1),
@@ -102,14 +102,16 @@ export const subscription = sqliteTable("subscription", {
   // the admin panel, not the org's own admins. Overrides the tier-default
   // retention window (computeRetentionExpiresAt) when set.
   retentionDaysOverride: integer("retention_days_override"),
-  // Prepaid credit for the metered tier, in cents -- topped up via a
-  // one-time Stripe Checkout payment (see /api/billing/topup), deducted
-  // per upload before processing starts. Unlike a postpaid Stripe
-  // subscription billed after the fact, this means the money is
-  // already in hand before any service is delivered: a declined card
-  // at some later billing date can never leave already-delivered work
-  // uncollectible.
+  // Unused since the pivot to object-based one-time packs (see
+  // pack_purchase / object-quota.ts) -- kept rather than dropped to avoid
+  // a migration just to remove a column with no replacement use.
   balanceCents: integer("balance_cents").notNull().default(0),
+  // How many more files this owner can convert. Free starts at
+  // FREE_OBJECT_LIMIT and is never topped up; Project Pack / Enterprise
+  // Migration purchases add to it (see pack_purchase). Meaningless for
+  // tier "enterprise" -- that tier is unlimited and never checks this
+  // column (see object-quota.ts).
+  objectsRemaining: integer("objects_remaining").notNull().default(3),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
@@ -169,10 +171,27 @@ export const packageIssue = sqliteTable("package_issue", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
-// One row per charged upload on the "metered" (pay-as-you-go) tier --
-// the local ledger of what was deducted from the prepaid balance
-// (see chargeForUpload) and when, for the owner's own reference and
-// for reconciling against Stripe's top-up payment history.
+// One row per completed one-time Stripe Checkout payment for a Project
+// Pack or Enterprise Migration pack. The unique stripeCheckoutSessionId
+// is what makes granting objects idempotent -- a webhook retry for an
+// already-processed checkout session is a no-op (see grantPackPurchase
+// in billing.ts) rather than double-crediting the owner.
+export const packPurchase = sqliteTable("pack_purchase", {
+  id: text("id").primaryKey(),
+  ownerType: text("owner_type", { enum: ["user", "org"] }).notNull(),
+  ownerId: text("owner_id").notNull(),
+  packTier: text("pack_tier", { enum: ["project_pack", "enterprise"] }).notNull(),
+  // null for "enterprise" -- that pack grants unlimited objects, not a
+  // specific count to add.
+  objectsGranted: integer("objects_granted"),
+  amountCents: integer("amount_cents").notNull(),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id").notNull().unique(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+// Unused since the pivot to object-based one-time packs (see
+// pack_purchase above) -- kept rather than dropped to avoid a migration
+// just to remove a now-dead table.
 export const meteredUsageEvent = sqliteTable("metered_usage_event", {
   id: text("id").primaryKey(),
   ownerType: text("owner_type", { enum: ["user", "org"] }).notNull(),

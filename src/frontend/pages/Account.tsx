@@ -32,14 +32,9 @@ const ICON_CHART = "M3 3v18h18 M8 17V10 M13 17V6 M18 17v-4";
 
 interface Usage {
   tier: string;
-  freeUploadLimit: number;
-  freeUploadsUsed: number;
-  freeUploadsRemaining: number;
-  balanceCents: number | null;
-  meteredMbBilledLifetime: number | null;
+  // null means unlimited (Enterprise).
+  objectsRemaining: number | null;
 }
-
-const TOPUP_PRESETS_CENTS = [500, 1000, 2500];
 
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
 
@@ -48,7 +43,7 @@ export default function Account() {
   const { data: session } = useSession();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [stats, setStats] = useState<ProcessingStats | null>(null);
-  const [billingBusy, setBillingBusy] = useState<"month" | "year" | "portal" | number | null>(null);
+  const [billingBusy, setBillingBusy] = useState<"project_pack" | "enterprise" | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -69,36 +64,14 @@ export default function Account() {
       .catch(() => setStats(null));
   }, []);
 
-  async function startCheckout(interval: "month" | "year") {
-    setBillingBusy(interval);
+  async function buyPack(packTier: "project_pack" | "enterprise") {
+    setBillingBusy(packTier);
     setBillingError(null);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const res = await fetch("/api/billing/checkout-pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval }),
-      });
-      const body = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !body.url) {
-        setBillingError(body.error === "billing_not_configured" ? t("account.billingNotConfigured") : t("account.checkoutFailed"));
-        setBillingBusy(null);
-        return;
-      }
-      window.location.href = body.url;
-    } catch {
-      setBillingError(t("account.checkoutFailed"));
-      setBillingBusy(null);
-    }
-  }
-
-  async function startTopup(amountCents: number) {
-    setBillingBusy(amountCents);
-    setBillingError(null);
-    try {
-      const res = await fetch("/api/billing/topup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountCents }),
+        body: JSON.stringify({ packTier }),
       });
       const body = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !body.url) {
@@ -140,24 +113,6 @@ export default function Account() {
     setNewPassword("");
     setConfirmPassword("");
     setPasswordSuccess(t("account.passwordUpdated"));
-  }
-
-  async function openBillingPortal() {
-    setBillingBusy("portal");
-    setBillingError(null);
-    try {
-      const res = await fetch("/api/billing/portal", { method: "POST" });
-      const body = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !body.url) {
-        setBillingError(t("account.billingPortalFailed"));
-        setBillingBusy(null);
-        return;
-      }
-      window.location.href = body.url;
-    } catch {
-      setBillingError(t("account.billingPortalFailed"));
-      setBillingBusy(null);
-    }
   }
 
   return (
@@ -221,66 +176,27 @@ export default function Account() {
                 {t("account.planLabel")}{" "}
                 <span className="capitalize">{t(`account.tierNames.${usage.tier}`, { defaultValue: usage.tier })}</span>
               </p>
-              {usage.tier === "free" && (
-                <p className="mt-1 text-sm text-slate-600">
-                  {t("account.freeUploadsUsed", { used: usage.freeUploadsUsed, limit: usage.freeUploadLimit })}
-                </p>
-              )}
-              {usage.tier === "metered" && usage.balanceCents !== null && (
-                <p className="mt-1 text-sm text-slate-600">
-                  {t("account.balance", { amount: `€${(usage.balanceCents / 100).toFixed(2)}` })}
-                  {usage.meteredMbBilledLifetime !== null && t("account.mbProcessedLifetime", { count: usage.meteredMbBilledLifetime })}
-                  {t("account.prepaidNote")}
-                </p>
-              )}
+              <p className="mt-1 text-sm text-slate-600">
+                {usage.objectsRemaining === null ? t("account.objectsUnlimited") : t("account.objectsRemaining", { count: usage.objectsRemaining })}
+              </p>
 
-              {usage.tier === "free" && (
+              {usage.tier !== "enterprise" && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
-                    onClick={() => startCheckout("month")}
+                    onClick={() => buyPack("project_pack")}
                     disabled={billingBusy !== null}
                     className={button("primary", "md")}
                   >
-                    {billingBusy === "month" ? t("account.redirecting") : t("account.upgradeMonthly")}
+                    {billingBusy === "project_pack" ? t("account.redirecting") : t("account.buyProjectPack")}
                   </button>
                   <button
-                    onClick={() => startCheckout("year")}
+                    onClick={() => buyPack("enterprise")}
                     disabled={billingBusy !== null}
                     className={button("secondary", "md")}
                   >
-                    {billingBusy === "year" ? t("account.redirecting") : t("account.upgradeYearly")}
+                    {billingBusy === "enterprise" ? t("account.redirecting") : t("account.buyEnterprise")}
                   </button>
                 </div>
-              )}
-
-              {(usage.tier === "free" || usage.tier === "metered") && (
-                <div className="mt-4 border-t border-slate-100 pt-4">
-                  <p className="text-sm text-slate-600">
-                    {usage.tier === "free" ? t("account.topUpPromptFree") : t("account.topUpPromptMetered")}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {TOPUP_PRESETS_CENTS.map((cents) => (
-                      <button
-                        key={cents}
-                        onClick={() => startTopup(cents)}
-                        disabled={billingBusy !== null}
-                        className={button("secondary", "md")}
-                      >
-                        {billingBusy === cents ? t("account.redirecting") : `+€${(cents / 100).toFixed(0)}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {usage.tier !== "free" && (
-                <button
-                  onClick={openBillingPortal}
-                  disabled={billingBusy !== null}
-                  className={`mt-4 ${button("secondary", "md")}`}
-                >
-                  {billingBusy === "portal" ? t("account.redirecting") : t("account.manageBilling")}
-                </button>
               )}
 
               {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}

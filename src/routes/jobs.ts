@@ -104,8 +104,8 @@ jobsRoute.get("/:id", requireAuth, async (c) => {
   });
 });
 
-// CSV export of a job's report -- Pro/Enterprise/metered only (Free gets
-// the on-screen report only, per the pricing page). Gated on the job's
+// CSV export of a job's report -- Project Pack/Enterprise only (Free
+// gets the on-screen report only, per the pricing page). Gated on the job's
 // own owner's tier, not the caller's currently-active workspace -- those
 // can differ (e.g. viewing a job in an org you belong to but aren't
 // currently switched into).
@@ -120,7 +120,7 @@ jobsRoute.get("/:id/export.csv", requireAuth, async (c) => {
   }
 
   const { tier } = await resolvePlanTierFor(db, jobRow.ownerType, jobRow.ownerId);
-  const requiredPlans = ["pro", "enterprise", "metered"] as const;
+  const requiredPlans = ["project_pack", "enterprise"] as const;
   if (!(requiredPlans as readonly string[]).includes(tier)) {
     return c.json({ error: "plan_upgrade_required", requiredPlans }, 403);
   }

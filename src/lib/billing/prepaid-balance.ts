@@ -1,3 +1,8 @@
+// Superseded by object-quota.ts's per-object consumption (see the
+// pricing pivot in CHANGELOG) -- no longer called from any route. Left
+// in place rather than deleted for now; a later cleanup pass can remove
+// this alongside the unused balance_cents column and metered_usage_event
+// table it reads/writes.
 import { and, eq, sql } from "drizzle-orm";
 import { meteredUsageEvent, subscription } from "../db/schema";
 import type { Db } from "../db/client";

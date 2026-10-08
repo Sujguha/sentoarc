@@ -1,17 +1,17 @@
 import { Hono } from "hono";
-import { eq, and, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createDb } from "../lib/db/client";
-import { job, pkg, usageCounter } from "../lib/db/schema";
+import { job, pkg } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
-import { resolvePlanTier, requirePlan } from "../middleware/require-plan";
+import { resolvePlanTier } from "../middleware/require-plan";
 import { computeRetentionExpiresAt } from "../lib/retention";
 import { logAudit } from "../lib/audit";
-import { chargeForUpload } from "../lib/billing/prepaid-balance";
+import { peekObjectsRemaining, consumeObject } from "../lib/billing/object-quota";
 import type { AppBindings } from "../types/hono";
 import type { Env, ProcessingQueueMessage } from "../types/env";
 
-// Bulk upload (multiple files in one job) is a Pro/Enterprise feature —
-// Free stays "single packages only" per the pricing page.
+// Bulk upload (multiple files in one job) is open to every tier -- Free
+// can do it too, just limited by its object quota like anything else.
 const MAX_BULK_FILES = 50;
 
 export const uploadsRoute = new Hono<AppBindings>();
@@ -94,21 +94,10 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
 
   const db = createDb(c.env.DB);
 
-  if (tier === "free") {
-    const freeLimit = Number(c.env.FREE_UPLOAD_LIMIT);
-    const [row] = await db
-      .select({ value: usageCounter.value })
-      .from(usageCounter)
-      .where(
-        and(
-          eq(usageCounter.ownerType, ownerType),
-          eq(usageCounter.ownerId, ownerId),
-          eq(usageCounter.metric, "free_uploads_used")
-        )
-      )
-      .limit(1);
-    if ((row?.value ?? 0) >= freeLimit) {
-      return c.json({ error: "free_limit_reached", freeLimit }, 403);
+  if (tier !== "enterprise") {
+    const objectsRemaining = await peekObjectsRemaining(db, { ownerType, ownerId }, Number(c.env.FREE_OBJECT_LIMIT));
+    if (objectsRemaining < 1) {
+      return c.json({ error: "object_quota_exhausted", objectsRemaining }, 403);
     }
   }
 
@@ -160,7 +149,7 @@ uploadsRoute.post("/init", requireAuth, resolvePlanTier, async (c) => {
 // entries are themselves ZIPs — that's auto-detected and expanded by the
 // queue consumer instead). Each returned uploadUrl is the same
 // PUT /:packageId/file endpoint used by a single upload.
-uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro", "enterprise", "metered"]), async (c) => {
+uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, async (c) => {
   const user = c.get("user");
   const tier = c.get("planTier");
   const ownerType = c.get("ownerType");
@@ -201,6 +190,17 @@ uploadsRoute.post("/bulk/init", requireAuth, resolvePlanTier, requirePlan(["pro"
   }
 
   const db = createDb(c.env.DB);
+
+  // Upfront, whole-batch check -- rejecting the batch now with a clear
+  // count is better than letting every file's PUT individually 402 once
+  // the quota that was there at init time runs out partway through.
+  if (tier !== "enterprise") {
+    const objectsRemaining = await peekObjectsRemaining(db, { ownerType, ownerId }, Number(c.env.FREE_OBJECT_LIMIT));
+    if (prepared.length > objectsRemaining) {
+      return c.json({ error: "object_quota_exceeded", objectsRemaining, requested: prepared.length }, 403);
+    }
+  }
+
   const now = new Date();
   const jobId = crypto.randomUUID();
 
@@ -294,52 +294,20 @@ uploadsRoute.put("/:packageId/file", requireAuth, resolvePlanTier, async (c) => 
     return c.json({ error: "package_too_large", maxBytes }, 413);
   }
 
-  if (tier === "free") {
-    const freeLimit = Number(c.env.FREE_UPLOAD_LIMIT);
-    await db
-      .insert(usageCounter)
-      .values({ ownerType, ownerId, metric: "free_uploads_used", value: 0, updatedAt: new Date() })
-      .onConflictDoNothing();
-
-    const updated = await db
-      .update(usageCounter)
-      .set({ value: sql`${usageCounter.value} + 1`, updatedAt: new Date() })
-      .where(
-        and(
-          eq(usageCounter.ownerType, ownerType),
-          eq(usageCounter.ownerId, ownerId),
-          eq(usageCounter.metric, "free_uploads_used"),
-          sql`${usageCounter.value} < ${freeLimit}`
-        )
-      )
-      .returning({ value: usageCounter.value });
-
-    if (updated.length === 0) {
-      return c.json({ error: "free_limit_reached", freeLimit }, 403);
-    }
-  }
-
-  if (tier === "metered") {
-    // Prepaid: the balance must cover this upload BEFORE anything is
-    // stored or processed -- unlike the old postpaid design, there is
-    // no "process now, bill later" step here. A declined top-up is the
-    // customer's problem to fix before uploading again, never ours to
-    // collect on after the fact.
-    const charge = await chargeForUpload(db, {
-      ownerType,
-      ownerId,
-      jobId: row.jobId,
-      packageId,
-      sizeBytes: body.byteLength,
-      unitPriceCents: Number(c.env.METERED_UNIT_PRICE_CENTS),
-    });
-    if (!charge.ok) {
+  if (tier !== "enterprise") {
+    // The quota must cover this upload BEFORE anything is stored or
+    // processed -- there is no "process now, reconcile later" step.
+    // Running out mid-upload is the customer's problem to fix (buy
+    // another pack) before uploading again, never ours to collect on
+    // after the fact. This is the real, race-safe enforcement point;
+    // the check at /init was only a fail-fast precheck.
+    const result = await consumeObject(db, { ownerType, ownerId }, Number(c.env.FREE_OBJECT_LIMIT));
+    if (!result.ok) {
       return c.json(
         {
-          error: "insufficient_balance",
-          costCents: charge.costCents,
-          balanceCents: charge.balanceCents,
-          message: `This upload would cost €${(charge.costCents / 100).toFixed(2)}, but your balance is only €${(charge.balanceCents / 100).toFixed(2)}. Top up to continue.`,
+          error: "object_quota_exhausted",
+          objectsRemaining: result.objectsRemaining,
+          message: "You're out of objects on your current plan. Buy a pack to continue.",
         },
         402
       );

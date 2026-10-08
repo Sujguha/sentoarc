@@ -44,7 +44,7 @@
     },
     "pricingTeaser": {
       "title": "Simple pricing",
-      "body": "Start free with up to a handful of packages. Upgrade to Pro for bulk migrations, or talk to us about Enterprise if you have multiple teams.",
+      "body": "Try it free on a few files, no risk. Buy a Project Pack for a one-off migration, or Enterprise Migration if you're moving a full SAP catalog with multiple teams.",
       "link": "View full pricing →"
     },
     "faq": {
@@ -86,49 +86,38 @@
     "title": "Pricing",
     "tiers": {
       "free": {
-        "name": "Free",
-        "description": "Try it on a handful of packages.",
-        "features": ["Up to 5 package uploads total", "Single packages only", "Fixed ZIP download", "On-screen report"],
-        "cta": "Sign up free"
+        "name": "Free / Proof",
+        "description": "Verify the output plays cleanly in your WalkMe Arc tenant without risk.",
+        "features": ["Up to 3 objects (1 group, or 3 files separately)", "Bulk upload included", "On-screen report"],
+        "cta": "Try it free"
       },
-      "metered": {
-        "name": "Metered",
-        "cadence": "per MB processed (e.g. 10 MB ≈ €0.10)",
-        "description": "Pay as you go — no subscription, no commitment.",
+      "project_pack": {
+        "name": "Project Pack",
+        "cadence": "one-time",
+        "description": "For a small or mid-sized team with a specific catalog to move.",
         "features": [
-          "No upload-count limit",
+          "Up to 100 objects",
+          "Self-serve upload & download",
           "Bulk upload (multiple ZIPs or a ZIP of ZIPs)",
           "CSV report export",
           "Translation-path rewrite",
           "30-day job history"
         ],
-        "cta": "Start pay-as-you-go"
-      },
-      "pro": {
-        "name": "Pro",
-        "cadence": "per user / month, billed monthly or yearly",
-        "description": "For ongoing migrations.",
-        "features": [
-          "Unlimited uploads",
-          "Bulk upload (multiple ZIPs or a ZIP of ZIPs)",
-          "CSV report export",
-          "Translation-path rewrite",
-          "30-day job history"
-        ],
-        "cta": "Start Pro"
+        "cta": "Buy Project Pack"
       },
       "enterprise": {
-        "name": "Enterprise",
-        "price": "Contact us",
-        "cadence": "per company",
-        "description": "For multiple teams migrating together.",
+        "name": "Enterprise Migration",
+        "cadence": "one-time",
+        "description": "For a full-catalog transition at a large SAP organization.",
         "features": [
+          "Unlimited objects",
+          "Custom mapping & priority support",
           "Multiple users with roles (admin / editor / viewer)",
           "Shared migration projects",
           "Full audit log",
           "Configurable data retention"
         ],
-        "cta": "Contact sales"
+        "cta": "Buy Enterprise Migration"
       }
     }
   },
@@ -163,16 +152,14 @@
     "uploadingAsPrefix": "Uploading as",
     "uploadingAsSuffix": "({{role}}) — shared with your team.",
     "switchWorkspace": "Switch workspace",
-    "balance": "Balance: {{amount}}",
-    "topUp": "Top up",
+    "objectsRemaining": "{{count}} objects remaining on your plan.",
+    "buyMore": "Buy more",
     "viewerNotice": "Viewers can see this team's uploads but can't add new ones.",
     "switchToPersonal": "Switch to your personal workspace",
     "toUploadOwnPackages": "to upload your own packages.",
     "chooseFiles": "Choose file(s)",
-    "chooseFile": "Choose a file",
     "uploading": "Uploading…",
     "hintBulk": " — select multiple files, or a single ZIP containing several SCORM package ZIPs, to process them as one batch.",
-    "hintSingle": ". Upgrade to Pro to upload multiple packages at once.",
     "acceptedTypes": "SCORM ZIP, PDF, Word, PowerPoint, HTML, images, audio, and video",
     "filesSelected": "{{count}} files selected",
     "migrationReport": "Migration report",
@@ -204,15 +191,15 @@
     },
     "errors": {
       "unsupported_file_type": "Please choose a SCORM ZIP, PDF, Word, PowerPoint, HTML, image, audio, or video file.",
-      "free_limit_reached": "You've used all of your free uploads. Upgrade to Pro for unlimited uploads.",
+      "object_quota_exhausted": "You're out of objects on your current plan. Buy a pack to continue.",
+      "object_quota_exceeded": "This batch has more files than you have objects remaining. Buy a pack, or split into a smaller batch.",
       "package_too_large": "That file is too large for the current plan limit.",
       "size_bytes_required": "Couldn't read the file size — please try again.",
       "already_uploaded": "This upload has already been submitted.",
       "empty_upload": "The file appears to be empty.",
       "files_required": "Please choose at least one file.",
       "too_many_files": "Too many files in one bulk upload — please split into smaller batches.",
-      "plan_upgrade_required": "Bulk upload (multiple files at once) requires a Pro plan.",
-      "insufficient_balance": "Your balance is too low for this upload — top up from your Account page.",
+      "plan_upgrade_required": "This feature requires a Project Pack or Enterprise Migration plan.",
       "generic": "Something went wrong — please try again.",
       "connection": "Upload failed — please check your connection and try again."
     }
@@ -235,24 +222,16 @@
     "plansAndPricing": "Plans & Pricing",
     "planLabel": "Plan:",
     "tierNames": {
-      "free": "free",
-      "pro": "pro",
-      "enterprise": "enterprise",
-      "metered": "metered"
+      "free": "free / proof",
+      "project_pack": "project pack",
+      "enterprise": "enterprise migration"
     },
-    "freeUploadsUsed": "{{used}} / {{limit}} free uploads used",
-    "balance": "Balance: {{amount}}",
-    "mbProcessedLifetime": " · {{count}} MB processed lifetime",
-    "prepaidNote": " — prepaid, deducted per upload, no subscription",
-    "upgradeMonthly": "Upgrade to Pro (monthly)",
-    "upgradeYearly": "Upgrade to Pro (yearly)",
+    "objectsRemaining": "{{count}} objects remaining",
+    "objectsUnlimited": "Unlimited objects",
+    "buyProjectPack": "Buy Project Pack (€499, 100 objects)",
+    "buyEnterprise": "Buy Enterprise Migration (€1,999, unlimited)",
     "redirecting": "Redirecting…",
-    "topUpPromptFree": "Or pay as you go — top up a balance, no subscription:",
-    "topUpPromptMetered": "Top up your balance:",
-    "manageBilling": "Manage billing",
-    "billingNotConfigured": "That plan isn't available to self-serve yet — check back soon.",
     "checkoutFailed": "Couldn't start checkout — please try again.",
-    "billingPortalFailed": "Couldn't open billing — please try again.",
     "usageStats": "Usage stats",
     "privacyAndCookies": "Privacy & Cookies",
     "accountDeletionNote": "Account deletion lands in a later phase."

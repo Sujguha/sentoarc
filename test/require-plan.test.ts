@@ -10,7 +10,7 @@ import type { AppBindings } from "../src/types/hono";
 async function seedSubscription(
   ownerType: "user" | "org",
   ownerId: string,
-  tier: "free" | "pro" | "enterprise" | "metered",
+  tier: "free" | "project_pack" | "enterprise",
   opts: { status?: string; retentionDaysOverride?: number | null; stripeCustomerId?: string | null } = {}
 ) {
   const db = createDb(env.DB);
@@ -52,7 +52,7 @@ async function seedUser(): Promise<string> {
 // themselves are the real production middleware.
 function appWithFakeUser(
   userId: string,
-  allowed: Array<"free" | "pro" | "enterprise" | "metered">,
+  allowed: Array<"free" | "project_pack" | "enterprise">,
   activeOrganizationId: string | null = null
 ) {
   const fakeAuth = createMiddleware<AppBindings>(async (c, next) => {
@@ -75,23 +75,23 @@ describe("resolvePlanTierFor", () => {
 
   it("returns the stored tier for an active subscription", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "pro");
+    await seedSubscription("user", ownerId, "project_pack");
     const db = createDb(env.DB);
-    expect((await resolvePlanTierFor(db, "user", ownerId)).tier).toBe("pro");
+    expect((await resolvePlanTierFor(db, "user", ownerId)).tier).toBe("project_pack");
   });
 
   it("falls back to free for a canceled subscription, regardless of its stored tier", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "pro", { status: "canceled" });
+    await seedSubscription("user", ownerId, "project_pack", { status: "canceled" });
     const db = createDb(env.DB);
     expect((await resolvePlanTierFor(db, "user", ownerId)).tier).toBe("free");
   });
 
   it("treats past_due as still active", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "pro", { status: "past_due" });
+    await seedSubscription("user", ownerId, "project_pack", { status: "past_due" });
     const db = createDb(env.DB);
-    expect((await resolvePlanTierFor(db, "user", ownerId)).tier).toBe("pro");
+    expect((await resolvePlanTierFor(db, "user", ownerId)).tier).toBe("project_pack");
   });
 
   it("surfaces a founder-set retention override", async () => {
@@ -111,18 +111,18 @@ describe("resolvePlanTierFor", () => {
     expect(result.retentionDaysOverride).toBeNull();
   });
 
-  it("returns the metered tier and the owner's Stripe customer id", async () => {
+  it("returns the owner's Stripe customer id (set by a prior pack purchase)", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "metered", { stripeCustomerId: "cus_test_abc" });
+    await seedSubscription("user", ownerId, "project_pack", { stripeCustomerId: "cus_test_abc" });
     const db = createDb(env.DB);
     const result = await resolvePlanTierFor(db, "user", ownerId);
-    expect(result.tier).toBe("metered");
+    expect(result.tier).toBe("project_pack");
     expect(result.stripeCustomerId).toBe("cus_test_abc");
   });
 
   it("ignores a Stripe customer id on a canceled subscription", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "metered", { status: "canceled", stripeCustomerId: "cus_test_abc" });
+    await seedSubscription("user", ownerId, "project_pack", { status: "canceled", stripeCustomerId: "cus_test_abc" });
     const db = createDb(env.DB);
     const result = await resolvePlanTierFor(db, "user", ownerId);
     expect(result.stripeCustomerId).toBeNull();
@@ -130,34 +130,26 @@ describe("resolvePlanTierFor", () => {
 });
 
 describe("requirePlan", () => {
-  it("blocks a free-tier caller from a Pro-gated route", async () => {
+  it("blocks a free-tier caller from a Project Pack/Enterprise-gated route", async () => {
     const ownerId = crypto.randomUUID();
-    const app = appWithFakeUser(ownerId, ["pro", "enterprise"]);
+    const app = appWithFakeUser(ownerId, ["project_pack", "enterprise"]);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ error: "plan_upgrade_required" });
   });
 
-  it("allows a pro-tier caller through the same route", async () => {
+  it("allows a project_pack-tier caller through the same route", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "pro");
-    const app = appWithFakeUser(ownerId, ["pro", "enterprise"]);
+    await seedSubscription("user", ownerId, "project_pack");
+    const app = appWithFakeUser(ownerId, ["project_pack", "enterprise"]);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(200);
   });
 
-  it("allows a metered-tier caller through a route gated to pro/enterprise/metered", async () => {
+  it("blocks a project_pack-tier caller from a route gated to enterprise only", async () => {
     const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "metered");
-    const app = appWithFakeUser(ownerId, ["pro", "enterprise", "metered"]);
-    const res = await app.request("/gated", {}, env);
-    expect(res.status).toBe(200);
-  });
-
-  it("blocks a metered-tier caller from a route not gated to include metered", async () => {
-    const ownerId = crypto.randomUUID();
-    await seedSubscription("user", ownerId, "metered");
-    const app = appWithFakeUser(ownerId, ["pro", "enterprise"]);
+    await seedSubscription("user", ownerId, "project_pack");
+    const app = appWithFakeUser(ownerId, ["enterprise"]);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(403);
   });
@@ -169,7 +161,7 @@ describe("resolvePlanTier: active-org context", () => {
     const orgId = await seedOrgWithMember(userId, "editor");
     await seedSubscription("org", orgId, "enterprise");
 
-    const app = appWithFakeUser(userId, ["free", "pro", "enterprise"], orgId);
+    const app = appWithFakeUser(userId, ["free", "project_pack", "enterprise"], orgId);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ownerType: string; ownerId: string; orgRole: string };
@@ -182,7 +174,7 @@ describe("resolvePlanTier: active-org context", () => {
     const userId = await seedUser();
     const staleOrgId = crypto.randomUUID(); // never actually joined (or since removed)
 
-    const app = appWithFakeUser(userId, ["free", "pro", "enterprise"], staleOrgId);
+    const app = appWithFakeUser(userId, ["free", "project_pack", "enterprise"], staleOrgId);
     const res = await app.request("/gated", {}, env);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ownerType: string; ownerId: string; orgRole: string | null };

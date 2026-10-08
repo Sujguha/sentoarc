@@ -292,9 +292,8 @@ export default function Admin() {
                               className={compactSelect}
                             >
                               <option value="free">Free</option>
-                              <option value="pro">Pro</option>
-                              <option value="metered">Metered</option>
-                              <option value="enterprise">Enterprise</option>
+                              <option value="project_pack">Project Pack</option>
+                              <option value="enterprise">Enterprise Migration</option>
                             </select>
                             <button onClick={() => saveTier(owner)} disabled={busy} className={button("secondary", "sm")}>
                               Save tier

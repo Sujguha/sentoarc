@@ -26,8 +26,9 @@ function stubQueueSend(): void {
 }
 
 async function seedJobAndPackage(
-  tier: "free" | "pro" | "enterprise",
-  bytes: Uint8Array
+  tier: "free" | "project_pack" | "enterprise",
+  bytes: Uint8Array,
+  objectsRemaining?: number
 ): Promise<{ jobId: string; packageId: string; r2Key: string; ownerId: string }> {
   const db = createDb(env.DB);
   const now = new Date();
@@ -50,6 +51,7 @@ async function seedJobAndPackage(
     ownerId,
     tier,
     status: "active",
+    ...(objectsRemaining !== undefined ? { objectsRemaining } : {}),
     createdAt: now,
     updatedAt: now,
   });
@@ -95,24 +97,24 @@ function buildZipOfZips(): Uint8Array {
 }
 
 describe("processPackageMessage: zip-of-zips expansion", () => {
-  it("rejects a bulk ZIP-of-ZIPs for a free-tier owner", async () => {
+  it("expands a bulk ZIP-of-ZIPs into one package per inner ZIP for a free-tier owner too", async () => {
+    stubQueueSend();
+    // Bulk is open to every tier now, just limited by the usual object
+    // quota -- a free-tier owner with their full default quota can
+    // still expand a small zip-of-zips.
     const { jobId, packageId, r2Key } = await seedJobAndPackage("free", buildZipOfZips());
     const db = createDb(env.DB);
 
     await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
 
-    const [pkgRow] = await db.select().from(pkg).where(eq(pkg.id, packageId)).limit(1);
-    expect(pkgRow?.status).toBe("failed");
-    expect(pkgRow?.errorMessage).toMatch(/pro plan/i);
-
-    const [jobRow] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
-    expect(jobRow?.status).toBe("failed");
-    expect(jobRow?.totalPackages).toBe(1);
+    const packages = await db.select().from(pkg).where(eq(pkg.jobId, jobId));
+    expect(packages).toHaveLength(2);
+    expect(packages.map((p) => p.originalFilename).sort()).toEqual(["course-a.zip", "course-b.zip"]);
   });
 
-  it("expands a bulk ZIP-of-ZIPs into one package per inner ZIP for a pro-tier owner", async () => {
+  it("expands a bulk ZIP-of-ZIPs into one package per inner ZIP for a project_pack-tier owner", async () => {
     stubQueueSend();
-    const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", buildZipOfZips());
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("project_pack", buildZipOfZips());
     const db = createDb(env.DB);
 
     await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
@@ -142,6 +144,25 @@ describe("processPackageMessage: zip-of-zips expansion", () => {
     }
     const [finalJob] = await db.select().from(job).where(eq(job.id, jobId)).limit(1);
     expect(finalJob?.status).toBe("completed");
+  });
+
+  it("refunds the container's charge, then stops expanding once the quota runs out", async () => {
+    stubQueueSend();
+    // 0 remaining represents an owner who had exactly 1 object and spent
+    // it on the container's own upload -- expansion must refund that 1
+    // (the container isn't a real deliverable) before charging per inner
+    // package, so exactly 1 of the 2 inner zips should fit.
+    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("free", buildZipOfZips(), 0);
+    const db = createDb(env.DB);
+
+    await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
+
+    const packages = await db.select().from(pkg).where(eq(pkg.jobId, jobId));
+    expect(packages).toHaveLength(1);
+    expect(packages[0]?.originalFilename).toBe("course-a.zip");
+
+    const [subRow] = await db.select().from(subscription).where(eq(subscription.ownerId, ownerId)).limit(1);
+    expect(subRow?.objectsRemaining).toBe(0);
   });
 });
 
@@ -234,7 +255,7 @@ describe("processPackageMessage: corrupted/unreadable input", () => {
     });
     const corruptedContainer = corruptCompressedData(container);
     stubQueueSend();
-    const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", corruptedContainer);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("project_pack", corruptedContainer);
     const db = createDb(env.DB);
 
     await expect(processPackageMessage({ type: "process", jobId, packageId, r2Key }, env)).resolves.toBeUndefined();
@@ -290,7 +311,7 @@ describe("processPackageMessage: translation-path rewrite gating", () => {
 
   it("applies the translation-path fix for a pro-tier owner", async () => {
     const bytes = buildFixtureZip("translation-path-mismatch", ["index.html", "en-us/narration.mp3"]);
-    const { jobId, packageId, r2Key } = await seedJobAndPackage("pro", bytes);
+    const { jobId, packageId, r2Key } = await seedJobAndPackage("project_pack", bytes);
     const db = createDb(env.DB);
 
     await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);
@@ -426,7 +447,7 @@ describe("processPackageMessage: processing stats", () => {
 
   it("records one processingStat row per expanded package in a bulk ZIP-of-ZIPs, not one for the container", async () => {
     stubQueueSend();
-    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("pro", buildZipOfZips());
+    const { jobId, packageId, r2Key, ownerId } = await seedJobAndPackage("project_pack", buildZipOfZips());
     const db = createDb(env.DB);
 
     await processPackageMessage({ type: "process", jobId, packageId, r2Key }, env);

@@ -13,7 +13,7 @@ export interface HonoVariables {
   // Set by requireAuth from the better-auth session; the org the user has
   // currently switched to, if any (set via /api/auth/organization/set-active).
   activeOrganizationId: string | null;
-  planTier: "free" | "pro" | "enterprise" | "metered";
+  planTier: "free" | "project_pack" | "enterprise";
   // Set by resolvePlanTier: who the request is actually acting as --
   // the active org (if the user is still a verified member of it) or
   // the user themself. Every owner-scoped query should use these, not
@@ -27,10 +27,9 @@ export interface HonoVariables {
   // or null to use the tier default.
   retentionDaysOverride: number | null;
   // Set by resolvePlanTier alongside planTier -- the resolved owner's
-  // Stripe customer id, if they have one. Only actually used on the
-  // metered tier (to attribute a billing meter event to the right
-  // customer), but resolved here rather than re-queried per-route since
-  // resolvePlanTier already reads this subscription row.
+  // Stripe customer id, if they have one (set by a prior pack purchase).
+  // Resolved here rather than re-queried per-route since resolvePlanTier
+  // already reads this subscription row.
   stripeCustomerId: string | null;
 }
 

@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/lib/db/client";
-import { subscription } from "../src/lib/db/schema";
+import { subscription, packPurchase } from "../src/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const WEBHOOK_SECRET = "not-a-real-secret--vitest-placeholder";
@@ -20,20 +20,27 @@ async function signStripePayload(payload: string, secret: string, timestamp = Ma
   return `t=${timestamp},v1=${hex}`;
 }
 
-function subscriptionUpdatedEvent(overrides: Record<string, unknown> = {}) {
+function checkoutCompletedEvent(opts: {
+  eventId: string;
+  sessionId: string;
+  ownerId: string;
+  customerId: string;
+  amountTotal: number;
+  packTier?: string;
+}) {
   return JSON.stringify({
-    id: "evt_test_1",
+    id: opts.eventId,
     object: "event",
-    type: "customer.subscription.updated",
+    type: "checkout.session.completed",
     data: {
       object: {
-        id: "sub_test_1",
-        object: "subscription",
-        customer: "cus_test_1",
-        status: "active",
-        current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
-        items: { data: [{ price: { id: "price_test_monthly" }, quantity: 1 }] },
-        ...overrides,
+        id: opts.sessionId,
+        object: "checkout.session",
+        mode: "payment",
+        client_reference_id: opts.ownerId,
+        customer: opts.customerId,
+        amount_total: opts.amountTotal,
+        metadata: opts.packTier ? { packTier: opts.packTier } : {},
       },
     },
   });
@@ -43,13 +50,27 @@ describe("POST /api/billing/webhook", () => {
   it("rejects a request with no stripe-signature header", async () => {
     const res = await SELF.fetch("https://example.com/api/billing/webhook", {
       method: "POST",
-      body: subscriptionUpdatedEvent(),
+      body: checkoutCompletedEvent({
+        eventId: "evt_1",
+        sessionId: "cs_1",
+        ownerId: "owner-1",
+        customerId: "cus_1",
+        amountTotal: 49900,
+        packTier: "project_pack",
+      }),
     });
     expect(res.status).toBe(400);
   });
 
   it("rejects a badly-signed payload", async () => {
-    const payload = subscriptionUpdatedEvent();
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_2",
+      sessionId: "cs_2",
+      ownerId: "owner-2",
+      customerId: "cus_2",
+      amountTotal: 49900,
+      packTier: "project_pack",
+    });
     const badSignature = await signStripePayload(payload, "whsec_wrong_secret");
     const res = await SELF.fetch("https://example.com/api/billing/webhook", {
       method: "POST",
@@ -57,27 +78,18 @@ describe("POST /api/billing/webhook", () => {
       body: payload,
     });
     expect(res.status).toBe(400);
-    expect((await res.json())).toMatchObject({ error: "signature_verification_failed" });
+    expect(await res.json()).toMatchObject({ error: "signature_verification_failed" });
   });
 
-  it("syncs an existing subscription row on a correctly-signed customer.subscription.updated event", async () => {
-    const db = createDb(env.DB);
-    const now = new Date();
-    await db.insert(subscription).values({
-      id: crypto.randomUUID(),
-      ownerType: "user",
-      ownerId: "test-user-1",
-      stripeCustomerId: "cus_test_1",
-      stripeSubscriptionId: "sub_old",
-      stripePriceId: null,
-      tier: "free",
-      status: "incomplete",
-      seats: 1,
-      createdAt: now,
-      updatedAt: now,
+  it("grants a fresh Project Pack purchase: tier, objects, and a ledger row", async () => {
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_pack_1",
+      sessionId: "cs_pack_1",
+      ownerId: "test-user-pack-1",
+      customerId: "cus_pack_1",
+      amountTotal: 49900,
+      packTier: "project_pack",
     });
-
-    const payload = subscriptionUpdatedEvent();
     const signature = await signStripePayload(payload, WEBHOOK_SECRET);
     const res = await SELF.fetch("https://example.com/api/billing/webhook", {
       method: "POST",
@@ -86,47 +98,62 @@ describe("POST /api/billing/webhook", () => {
     });
     expect(res.status).toBe(200);
 
-    const [row] = await db
-      .select()
-      .from(subscription)
-      .where(eq(subscription.stripeCustomerId, "cus_test_1"))
-      .limit(1);
-    expect(row?.tier).toBe("pro");
-    expect(row?.status).toBe("active");
-    expect(row?.stripeSubscriptionId).toBe("sub_test_1");
+    const db = createDb(env.DB);
+    const [row] = await db.select().from(subscription).where(eq(subscription.stripeCustomerId, "cus_pack_1")).limit(1);
+    expect(row).toMatchObject({ ownerId: "test-user-pack-1", tier: "project_pack", objectsRemaining: 100, status: "active" });
+
+    const [purchase] = await db.select().from(packPurchase).where(eq(packPurchase.stripeCheckoutSessionId, "cs_pack_1")).limit(1);
+    expect(purchase).toMatchObject({ packTier: "project_pack", objectsGranted: 100, amountCents: 49900 });
   });
 
-  it("downgrades to free when the subscription is cancelled", async () => {
+  it("grants Enterprise Migration as unlimited (tier set, objectsRemaining untouched)", async () => {
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_ent_1",
+      sessionId: "cs_ent_1",
+      ownerId: "test-user-ent-1",
+      customerId: "cus_ent_1",
+      amountTotal: 199900,
+      packTier: "enterprise",
+    });
+    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
+    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+
+    const db = createDb(env.DB);
+    const [row] = await db.select().from(subscription).where(eq(subscription.stripeCustomerId, "cus_ent_1")).limit(1);
+    expect(row?.tier).toBe("enterprise");
+
+    const [purchase] = await db.select().from(packPurchase).where(eq(packPurchase.stripeCheckoutSessionId, "cs_ent_1")).limit(1);
+    expect(purchase).toMatchObject({ packTier: "enterprise", objectsGranted: null, amountCents: 199900 });
+  });
+
+  it("stacks a second Project Pack purchase onto the existing objectsRemaining", async () => {
     const db = createDb(env.DB);
     const now = new Date();
     await db.insert(subscription).values({
       id: crypto.randomUUID(),
       ownerType: "user",
-      ownerId: "test-user-2",
-      stripeCustomerId: "cus_test_2",
-      stripeSubscriptionId: "sub_test_2",
-      stripePriceId: "price_test_monthly",
-      tier: "pro",
+      ownerId: "test-user-pack-2",
+      stripeCustomerId: "cus_pack_2",
+      tier: "project_pack",
       status: "active",
+      objectsRemaining: 30,
       seats: 1,
       createdAt: now,
       updatedAt: now,
     });
 
-    const payload = JSON.stringify({
-      id: "evt_test_2",
-      object: "event",
-      type: "customer.subscription.deleted",
-      data: {
-        object: {
-          id: "sub_test_2",
-          object: "subscription",
-          customer: "cus_test_2",
-          status: "canceled",
-          current_period_end: Math.floor(Date.now() / 1000),
-          items: { data: [{ price: { id: "price_test_monthly" }, quantity: 1 }] },
-        },
-      },
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_pack_2",
+      sessionId: "cs_pack_2",
+      ownerId: "test-user-pack-2",
+      customerId: "cus_pack_2",
+      amountTotal: 49900,
+      packTier: "project_pack",
     });
     const signature = await signStripePayload(payload, WEBHOOK_SECRET);
     const res = await SELF.fetch("https://example.com/api/billing/webhook", {
@@ -136,127 +163,82 @@ describe("POST /api/billing/webhook", () => {
     });
     expect(res.status).toBe(200);
 
-    const [row] = await db
-      .select()
-      .from(subscription)
-      .where(eq(subscription.stripeCustomerId, "cus_test_2"))
-      .limit(1);
-    expect(row?.tier).toBe("free");
-    expect(row?.status).toBe("canceled");
+    const [row] = await db.select().from(subscription).where(eq(subscription.stripeCustomerId, "cus_pack_2")).limit(1);
+    expect(row?.objectsRemaining).toBe(130);
   });
 
-  // Pay-as-you-go is prepaid balance now, topped up via a one-time
-  // (mode: "payment") Checkout session rather than a subscription --
-  // this is the event that actually credits it.
-  it("credits a new prepaid balance and sets tier to metered for a first-time top-up", async () => {
-    const payload = JSON.stringify({
-      id: "evt_test_topup_1",
-      object: "event",
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          id: "cs_test_topup_1",
-          object: "checkout.session",
-          mode: "payment",
-          client_reference_id: "test-user-topup-1",
-          customer: "cus_test_topup_1",
-          amount_total: 1000,
-        },
-      },
-    });
-    const signature = await signStripePayload(payload, WEBHOOK_SECRET);
-    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
-      method: "POST",
-      headers: { "stripe-signature": signature },
-      body: payload,
-    });
-    expect(res.status).toBe(200);
-
-    const db = createDb(env.DB);
-    const [row] = await db
-      .select()
-      .from(subscription)
-      .where(eq(subscription.stripeCustomerId, "cus_test_topup_1"))
-      .limit(1);
-    expect(row).toMatchObject({ ownerId: "test-user-topup-1", tier: "metered", balanceCents: 1000, status: "active" });
-  });
-
-  it("adds to an existing balance without downgrading an already-paid tier", async () => {
+  it("never downgrades an existing Enterprise owner who (re-)buys a Project Pack", async () => {
     const db = createDb(env.DB);
     const now = new Date();
     await db.insert(subscription).values({
       id: crypto.randomUUID(),
       ownerType: "user",
-      ownerId: "test-user-topup-2",
-      stripeCustomerId: "cus_test_topup_2",
-      tier: "pro",
+      ownerId: "test-user-ent-2",
+      stripeCustomerId: "cus_ent_2",
+      tier: "enterprise",
       status: "active",
-      balanceCents: 250,
+      objectsRemaining: 0,
       seats: 1,
       createdAt: now,
       updatedAt: now,
     });
 
-    const payload = JSON.stringify({
-      id: "evt_test_topup_2",
-      object: "event",
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          id: "cs_test_topup_2",
-          object: "checkout.session",
-          mode: "payment",
-          client_reference_id: "test-user-topup-2",
-          customer: "cus_test_topup_2",
-          amount_total: 500,
-        },
-      },
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_ent_2",
+      sessionId: "cs_ent_2",
+      ownerId: "test-user-ent-2",
+      customerId: "cus_ent_2",
+      amountTotal: 49900,
+      packTier: "project_pack",
     });
     const signature = await signStripePayload(payload, WEBHOOK_SECRET);
-    const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+    await SELF.fetch("https://example.com/api/billing/webhook", {
       method: "POST",
       headers: { "stripe-signature": signature },
       body: payload,
     });
-    expect(res.status).toBe(200);
 
-    const [row] = await db
-      .select()
-      .from(subscription)
-      .where(eq(subscription.stripeCustomerId, "cus_test_topup_2"))
-      .limit(1);
-    // Already on Pro -- the top-up still credits the balance (dormant
-    // until/unless they ever drop to pay-as-you-go), but must not
-    // overwrite their paid tier.
-    expect(row).toMatchObject({ tier: "pro", balanceCents: 750 });
+    const [row] = await db.select().from(subscription).where(eq(subscription.stripeCustomerId, "cus_ent_2")).limit(1);
+    expect(row?.tier).toBe("enterprise");
+  });
+
+  it("is idempotent against a redelivered webhook for the same checkout session", async () => {
+    const payload = checkoutCompletedEvent({
+      eventId: "evt_pack_3",
+      sessionId: "cs_pack_3",
+      ownerId: "test-user-pack-3",
+      customerId: "cus_pack_3",
+      amountTotal: 49900,
+      packTier: "project_pack",
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const signature = await signStripePayload(payload, WEBHOOK_SECRET);
+      const res = await SELF.fetch("https://example.com/api/billing/webhook", {
+        method: "POST",
+        headers: { "stripe-signature": signature },
+        body: payload,
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const db = createDb(env.DB);
+    const [row] = await db.select().from(subscription).where(eq(subscription.stripeCustomerId, "cus_pack_3")).limit(1);
+    // Granted once, not twice -- the second delivery must be a no-op.
+    expect(row?.objectsRemaining).toBe(100);
+
+    const purchases = await db.select().from(packPurchase).where(eq(packPurchase.stripeCheckoutSessionId, "cs_pack_3"));
+    expect(purchases).toHaveLength(1);
   });
 });
 
-describe("POST /api/billing/checkout", () => {
+describe("POST /api/billing/checkout-pack", () => {
   it("requires auth", async () => {
-    const res = await SELF.fetch("https://example.com/api/billing/checkout", {
+    const res = await SELF.fetch("https://example.com/api/billing/checkout-pack", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interval: "month" }),
+      body: JSON.stringify({ packTier: "project_pack" }),
     });
-    expect(res.status).toBe(401);
-  });
-});
-
-describe("POST /api/billing/topup", () => {
-  it("requires auth", async () => {
-    const res = await SELF.fetch("https://example.com/api/billing/topup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amountCents: 1000 }),
-    });
-    expect(res.status).toBe(401);
-  });
-});
-
-describe("POST /api/billing/portal", () => {
-  it("requires auth", async () => {
-    const res = await SELF.fetch("https://example.com/api/billing/portal", { method: "POST" });
     expect(res.status).toBe(401);
   });
 });

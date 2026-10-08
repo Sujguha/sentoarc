@@ -26,7 +26,7 @@ async function seedSubscription(ownerType: "user" | "org", ownerId: string, tier
     id: crypto.randomUUID(),
     ownerType,
     ownerId,
-    tier: tier as "free" | "pro" | "enterprise" | "metered",
+    tier: tier as "free" | "project_pack" | "enterprise",
     status: "active",
     retentionDaysOverride,
     seats: 1,
@@ -58,14 +58,14 @@ describe("searchOwners", () => {
   });
 
   it("includes the current tier and retention override when a subscription row exists", async () => {
-    const userId = await seedUser("pro-user@example.com");
-    await seedSubscription("user", userId, "pro", 90);
+    const userId = await seedUser("pack-user@example.com");
+    await seedSubscription("user", userId, "project_pack", 90);
     const db = createDb(env.DB);
 
-    const results = await searchOwners(db, "pro-user");
+    const results = await searchOwners(db, "pack-user");
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ tier: "pro", retentionDaysOverride: 90 });
+    expect(results[0]).toMatchObject({ tier: "project_pack", retentionDaysOverride: 90 });
   });
 
   it("returns an empty list when nothing matches", async () => {

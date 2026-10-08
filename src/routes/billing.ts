@@ -2,67 +2,43 @@ import { Hono } from "hono";
 import { eq, and, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { createDb } from "../lib/db/client";
-import { subscription } from "../lib/db/schema";
+import { subscription, packPurchase } from "../lib/db/schema";
 import { requireAuth } from "../middleware/require-auth";
 import { createStripeClient, createStripeCryptoProvider } from "../lib/billing/stripe-client";
 import type { AppBindings } from "../types/hono";
+import type { Env } from "../types/env";
 
 export const billingRoute = new Hono<AppBindings>();
 
-// Pay-as-you-go is prepaid balance (see /topup below), not a Stripe
-// subscription -- a customer can top up any amount at or above this,
-// no pre-created Stripe Price needed since the amount is theirs to pick.
-const MIN_TOPUP_CENTS = 200;
+type PackTier = "project_pack" | "enterprise";
 
-// Checkout: starts a new Pro subscription, or resumes billing for a
-// user who already has a Stripe customer (e.g. a previously cancelled
-// sub). Seats are fixed at 1 for now -- Enterprise (multi-seat, roles)
-// is a contact-sales flow, not self-serve checkout.
-billingRoute.post("/checkout", requireAuth, async (c) => {
+function packPriceCents(packTier: PackTier, env: Env): number {
+  return Number(packTier === "project_pack" ? env.PROJECT_PACK_PRICE_CENTS : env.ENTERPRISE_PACK_PRICE_CENTS);
+}
+
+// null means unlimited (Enterprise Migration).
+function packObjectsGranted(packTier: PackTier, env: Env): number | null {
+  return packTier === "project_pack" ? Number(env.PROJECT_PACK_OBJECTS) : null;
+}
+
+function packProductName(packTier: PackTier): string {
+  return packTier === "project_pack" ? "SENtoArc Project Pack (100 objects)" : "SENtoArc Enterprise Migration (unlimited objects)";
+}
+
+// Buys a one-time pack (Project Pack or Enterprise Migration) via Stripe
+// Checkout (mode: "payment", not "subscription" -- there is no recurring
+// billing left in this app). The amount is built as inline price_data
+// rather than a pre-created Stripe Price: both packs have a fixed price,
+// but creating real Price objects ahead of time needs either the Stripe
+// Dashboard or a one-off setup script, and price_data is exactly as
+// correct for a fixed amount as it was for the old pay-as-you-go top-up's
+// customer-chosen one.
+billingRoute.post("/checkout-pack", requireAuth, async (c) => {
   const user = c.get("user");
-  const body = await c.req.json<{ interval?: "month" | "year" }>().catch(() => ({ interval: undefined }));
-  const interval = body.interval === "year" ? "year" : "month";
-  const priceId = interval === "year" ? c.env.STRIPE_PRICE_ID_YEARLY : c.env.STRIPE_PRICE_ID_MONTHLY;
-  if (!priceId) {
-    return c.json({ error: "billing_not_configured" }, 503);
-  }
-
-  const db = createDb(c.env.DB);
-  const [existing] = await db
-    .select({ stripeCustomerId: subscription.stripeCustomerId })
-    .from(subscription)
-    .where(and(eq(subscription.ownerType, "user"), eq(subscription.ownerId, user.id)))
-    .limit(1);
-
-  const stripe = createStripeClient(c.env);
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    client_reference_id: user.id,
-    ...(existing?.stripeCustomerId
-      ? { customer: existing.stripeCustomerId }
-      : { customer_email: user.email }),
-    success_url: `${c.env.APP_BASE_URL}/account?checkout=success`,
-    cancel_url: `${c.env.APP_BASE_URL}/account?checkout=cancelled`,
-  });
-
-  if (!session.url) {
-    return c.json({ error: "checkout_session_failed" }, 502);
-  }
-  return c.json({ url: session.url });
-});
-
-// Top up the prepaid pay-as-you-go balance. A one-time payment, not a
-// subscription -- the amount is chosen by the customer at checkout
-// time, so it's built as an inline price_data line item rather than a
-// pre-created Stripe Price (there's no fixed set of amounts to
-// pre-create prices for).
-billingRoute.post("/topup", requireAuth, async (c) => {
-  const user = c.get("user");
-  const body = await c.req.json<{ amountCents?: number }>().catch(() => null);
-  const amountCents = body?.amountCents;
-  if (amountCents === undefined || !Number.isInteger(amountCents) || amountCents < MIN_TOPUP_CENTS) {
-    return c.json({ error: "invalid_amount", minCents: MIN_TOPUP_CENTS }, 400);
+  const body = await c.req.json<{ packTier?: string }>().catch(() => null);
+  const packTier = body?.packTier;
+  if (packTier !== "project_pack" && packTier !== "enterprise") {
+    return c.json({ error: "invalid_pack_tier", allowed: ["project_pack", "enterprise"] }, 400);
   }
 
   const db = createDb(c.env.DB);
@@ -79,16 +55,19 @@ billingRoute.post("/topup", requireAuth, async (c) => {
       {
         price_data: {
           currency: "eur",
-          unit_amount: amountCents,
-          product_data: { name: "SENtoArc pay-as-you-go balance top-up" },
+          unit_amount: packPriceCents(packTier, c.env),
+          product_data: { name: packProductName(packTier) },
         },
         quantity: 1,
       },
     ],
     client_reference_id: user.id,
-    ...(existing?.stripeCustomerId
-      ? { customer: existing.stripeCustomerId }
-      : { customer_email: user.email }),
+    // Carries which pack this was through to the webhook -- the webhook
+    // never trusts anything client-sent, but it does trust its own
+    // signed-and-verified copy of what this route itself told Stripe to
+    // charge for.
+    metadata: { packTier },
+    ...(existing?.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: user.email }),
     success_url: `${c.env.APP_BASE_URL}/account?checkout=success`,
     cancel_url: `${c.env.APP_BASE_URL}/account?checkout=cancelled`,
   });
@@ -99,34 +78,9 @@ billingRoute.post("/topup", requireAuth, async (c) => {
   return c.json({ url: session.url });
 });
 
-// Billing portal: lets an existing Pro customer manage/cancel their own
-// subscription without us building that UI ourselves.
-billingRoute.post("/portal", requireAuth, async (c) => {
-  const user = c.get("user");
-  const db = createDb(c.env.DB);
-
-  const [row] = await db
-    .select({ stripeCustomerId: subscription.stripeCustomerId })
-    .from(subscription)
-    .where(and(eq(subscription.ownerType, "user"), eq(subscription.ownerId, user.id)))
-    .limit(1);
-
-  if (!row?.stripeCustomerId) {
-    return c.json({ error: "no_stripe_customer" }, 400);
-  }
-
-  const stripe = createStripeClient(c.env);
-  const session = await stripe.billingPortal.sessions.create({
-    customer: row.stripeCustomerId,
-    return_url: `${c.env.APP_BASE_URL}/account`,
-  });
-
-  return c.json({ url: session.url });
-});
-
-// Stripe webhook: the source of truth for subscription state. Never
-// trust client-reported plan tier -- only this handler, driven by
-// Stripe's own signed events, writes to the subscription table.
+// Stripe webhook: the source of truth for what was actually paid for.
+// Never trust client-reported pack tier or amount -- only this handler,
+// driven by Stripe's own signed events, grants objects.
 billingRoute.post("/webhook", async (c) => {
   const signature = c.req.header("stripe-signature");
   if (!signature) {
@@ -152,91 +106,86 @@ billingRoute.post("/webhook", async (c) => {
 
   const db = createDb(c.env.DB);
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const ownerId = session.client_reference_id;
-      if (!ownerId || typeof session.customer !== "string") break;
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const ownerId = session.client_reference_id;
+    const packTier = session.metadata?.packTier;
 
-      if (session.mode === "payment") {
-        // A top-up: credit the prepaid balance by what was actually
-        // paid, per Stripe's own record of the amount -- never a
-        // client-sent value.
-        await creditPrepaidBalance(db, ownerId, session.customer, session.amount_total ?? 0);
-      } else if (typeof session.subscription === "string") {
-        await upsertSubscriptionFromStripeSubscription(stripe, db, ownerId, session.customer, session.subscription);
-      }
-      break;
+    if (
+      ownerId &&
+      typeof session.customer === "string" &&
+      session.mode === "payment" &&
+      (packTier === "project_pack" || packTier === "enterprise")
+    ) {
+      await grantPackPurchase(db, {
+        ownerId,
+        stripeCustomerId: session.customer,
+        packTier,
+        objectsGranted: packObjectsGranted(packTier, c.env),
+        amountCents: session.amount_total ?? 0,
+        stripeCheckoutSessionId: session.id,
+      });
     }
-
-    case "customer.subscription.updated":
-    case "customer.subscription.deleted": {
-      const stripeSub = event.data.object as Stripe.Subscription;
-      await syncSubscriptionRow(db, stripeSub);
-      break;
-    }
-
-    default:
-      break;
   }
 
   return c.json({ received: true });
 });
 
-async function upsertSubscriptionFromStripeSubscription(
-  stripe: Stripe,
+// Credits a completed pack purchase. Idempotent against webhook
+// redelivery: the ledger insert's unique stripeCheckoutSessionId is what
+// actually prevents a retried event from granting the same pack's
+// objects twice -- only credit the subscription when that insert really
+// adds a new row, not when it's a no-op duplicate.
+async function grantPackPurchase(
   db: ReturnType<typeof createDb>,
-  ownerId: string,
-  stripeCustomerId: string,
-  stripeSubscriptionId: string
-) {
-  const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-  await writeSubscriptionRow(db, "user", ownerId, stripeCustomerId, stripeSub);
-}
-
-// customer.subscription.* events don't carry our internal ownerId, only
-// the Stripe customer/subscription ids -- look up the existing row by
-// stripeCustomerId (set during checkout.session.completed) to find it.
-async function syncSubscriptionRow(db: ReturnType<typeof createDb>, stripeSub: Stripe.Subscription) {
-  const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer.id;
-
-  const [existing] = await db
-    .select({ ownerType: subscription.ownerType, ownerId: subscription.ownerId })
-    .from(subscription)
-    .where(eq(subscription.stripeCustomerId, customerId))
-    .limit(1);
-
-  if (!existing) return; // no local row to reconcile (shouldn't happen post-checkout)
-
-  await writeSubscriptionRow(db, existing.ownerType, existing.ownerId, customerId, stripeSub);
-}
-
-// Credits a one-time top-up payment to the owner's prepaid balance.
-// Pay-as-you-go has no Stripe subscription of its own anymore, so this
-// is the only place that tier ever gets set to "metered" -- the first
-// top-up is what puts a free-tier account onto it; an existing Pro/
-// Enterprise account keeps its tier (the balance just sits there
-// dormant, e.g. for later if they ever downgrade).
-async function creditPrepaidBalance(
-  db: ReturnType<typeof createDb>,
-  ownerId: string,
-  stripeCustomerId: string,
-  amountCents: number
+  params: {
+    ownerId: string;
+    stripeCustomerId: string;
+    packTier: PackTier;
+    objectsGranted: number | null;
+    amountCents: number;
+    stripeCheckoutSessionId: string;
+  }
 ) {
   const now = new Date();
+
+  const inserted = await db
+    .insert(packPurchase)
+    .values({
+      id: crypto.randomUUID(),
+      ownerType: "user",
+      ownerId: params.ownerId,
+      packTier: params.packTier,
+      objectsGranted: params.objectsGranted,
+      amountCents: params.amountCents,
+      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
+      createdAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: packPurchase.id });
+
+  if (inserted.length === 0) return; // already processed this checkout session
+
   const [existing] = await db
     .select({ id: subscription.id, tier: subscription.tier })
     .from(subscription)
-    .where(and(eq(subscription.ownerType, "user"), eq(subscription.ownerId, ownerId)))
+    .where(and(eq(subscription.ownerType, "user"), eq(subscription.ownerId, params.ownerId)))
     .limit(1);
+
+  // Never downgrade an existing Enterprise owner, and always promote up
+  // to Enterprise regardless of what tier came before.
+  const nextTier = params.packTier === "enterprise" || existing?.tier === "enterprise" ? "enterprise" : "project_pack";
 
   if (existing) {
     await db
       .update(subscription)
       .set({
-        balanceCents: sql`${subscription.balanceCents} + ${amountCents}`,
-        stripeCustomerId,
-        tier: existing.tier === "free" ? "metered" : existing.tier,
+        tier: nextTier,
+        // Project Pack quotas stack across purchases; Enterprise is
+        // unlimited and ignores this column, so there's nothing to add.
+        objectsRemaining:
+          params.objectsGranted === null ? sql`${subscription.objectsRemaining}` : sql`${subscription.objectsRemaining} + ${params.objectsGranted}`,
+        stripeCustomerId: params.stripeCustomerId,
         status: "active",
         updatedAt: now,
       })
@@ -245,58 +194,14 @@ async function creditPrepaidBalance(
     await db.insert(subscription).values({
       id: crypto.randomUUID(),
       ownerType: "user",
-      ownerId,
-      stripeCustomerId,
-      tier: "metered",
+      ownerId: params.ownerId,
+      stripeCustomerId: params.stripeCustomerId,
+      tier: nextTier,
       status: "active",
-      balanceCents: amountCents,
+      objectsRemaining: params.objectsGranted ?? 0,
       seats: 1,
       createdAt: now,
       updatedAt: now,
-    });
-  }
-}
-
-async function writeSubscriptionRow(
-  db: ReturnType<typeof createDb>,
-  ownerType: "user" | "org",
-  ownerId: string,
-  stripeCustomerId: string,
-  stripeSub: Stripe.Subscription
-) {
-  const now = new Date();
-  const priceId = stripeSub.items.data[0]?.price.id ?? null;
-  // The only Stripe subscriptions left are Pro monthly/yearly --
-  // pay-as-you-go is prepaid balance now, never a subscription tier
-  // resolved from a price id.
-  const tier = stripeSub.status === "canceled" || stripeSub.status === "incomplete_expired" ? "free" : "pro";
-
-  const [existing] = await db
-    .select({ id: subscription.id })
-    .from(subscription)
-    .where(and(eq(subscription.ownerType, ownerType), eq(subscription.ownerId, ownerId)))
-    .limit(1);
-
-  const values = {
-    stripeCustomerId,
-    stripeSubscriptionId: stripeSub.id,
-    stripePriceId: priceId,
-    tier: tier as "free" | "pro" | "metered",
-    status: stripeSub.status,
-    currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-    seats: stripeSub.items.data[0]?.quantity ?? 1,
-    updatedAt: now,
-  };
-
-  if (existing) {
-    await db.update(subscription).set(values).where(eq(subscription.id, existing.id));
-  } else {
-    await db.insert(subscription).values({
-      id: crypto.randomUUID(),
-      ownerType,
-      ownerId,
-      ...values,
-      createdAt: now,
     });
   }
 }

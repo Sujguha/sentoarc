@@ -6,6 +6,7 @@ import { fixPackage, type PackageIssue } from "./scorm/fixer";
 import { detectFileType, type DetectedFileType } from "./scorm/detect";
 import { wrapAsScorm } from "./scorm/wrapper";
 import { resolvePlanTierFor } from "../middleware/require-plan";
+import { consumeObject, refundObject } from "./billing/object-quota";
 import type { Env, ProcessingQueueMessage } from "../types/env";
 
 const INPUT_FORMAT_BY_DETECTED_TYPE: Record<
@@ -150,7 +151,7 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   const inputFormat = INPUT_FORMAT_BY_DETECTED_TYPE[detection.type];
 
   if (detection.type === "scorm-zip") {
-    const tier = await resolveOwnerTier(db, message.jobId);
+    const { tier } = await resolveOwnerTier(db, message.jobId);
     // detection only scans the central directory (never inflates -- see
     // listZipEntries), so a zip whose headers look fine but whose actual
     // compressed data is truncated/corrupted reaches this point
@@ -164,8 +165,8 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
     let result: ReturnType<typeof fixPackage>;
     try {
       result = fixPackage(bytes, detection.names!, {
-        // Pro/Enterprise/metered only -- see ValidatePackageOptions.
-        checkTranslationPaths: tier === "pro" || tier === "enterprise" || tier === "metered",
+        // Project Pack/Enterprise only -- see ValidatePackageOptions.
+        checkTranslationPaths: tier === "project_pack" || tier === "enterprise",
       });
     } catch {
       const msg = "This file looked like a SCORM ZIP but couldn't be read — it may be corrupted or incomplete. Try re-exporting and uploading it again.";
@@ -239,23 +240,34 @@ export async function processPackageMessage(message: ProcessingQueueMessage, env
   });
 }
 
-async function resolveOwnerTier(db: Db, jobId: string): Promise<"free" | "pro" | "enterprise" | "metered"> {
+interface OwnerAndTier {
+  tier: "free" | "project_pack" | "enterprise";
+  ownerType: "user" | "org";
+  ownerId: string;
+}
+
+async function resolveOwnerTier(db: Db, jobId: string): Promise<OwnerAndTier> {
   const [jobRow] = await db
     .select({ ownerType: job.ownerType, ownerId: job.ownerId })
     .from(job)
     .where(eq(job.id, jobId))
     .limit(1);
-  if (!jobRow) return "free";
-  return (await resolvePlanTierFor(db, jobRow.ownerType as "user" | "org", jobRow.ownerId)).tier;
+  if (!jobRow) return { tier: "free", ownerType: "user", ownerId: "" };
+  const ownerType = jobRow.ownerType as "user" | "org";
+  const tier = (await resolvePlanTierFor(db, ownerType, jobRow.ownerId)).tier;
+  return { tier, ownerType, ownerId: jobRow.ownerId };
 }
 
-// A "bulk" upload: the container itself isn't a package, its entries are.
-// Pro/Enterprise only -- Free stays "single packages only" per the
-// pricing page. Each inner .zip is extracted (not re-compressed; its
-// bytes already are a complete, valid .zip) into its own package row
-// under the same job and re-enqueued through the normal "process" path,
-// then the container row is replaced by however many packages were
-// actually found -- it was never itself a real deliverable.
+// A "bulk" upload: the container itself isn't a package, its entries
+// are. Open to every tier now -- Free can do "1 group" too, just within
+// its usual object quota. The container's own upload already consumed
+// one object (the normal per-file charge at PUT time), but the
+// container isn't itself a real deliverable, so that charge is refunded
+// before each real inner package consumes its own. Each inner .zip is
+// extracted (not re-compressed; its bytes already are a complete, valid
+// .zip) into its own package row under the same job and re-enqueued
+// through the normal "process" path, then the container row is replaced
+// by however many packages were actually found and affordable.
 async function expandZipOfZips(
   db: Db,
   env: Env,
@@ -263,28 +275,21 @@ async function expandZipOfZips(
   bytes: Uint8Array,
   innerNames: string[]
 ): Promise<void> {
-  const tier = await resolveOwnerTier(db, message.jobId);
+  const { tier, ownerType, ownerId } = await resolveOwnerTier(db, message.jobId);
+  const freeObjectLimit = Number(env.FREE_OBJECT_LIMIT);
 
-  if (tier === "free") {
-    const msg =
-      "This ZIP contains multiple SCORM packages. Bulk uploads (a ZIP of ZIPs) require a Pro plan — upgrade, or upload each package separately.";
-    await finishPackage(db, message, {
-      status: "failed",
-      errorMessage: msg,
-      issues: [{ severity: "error", code: "BULK_REQUIRES_PRO", message: msg, fixApplied: false }],
-      inputFormat: null,
-      scormVersionIn: null,
-      scormVersionOut: null,
-      r2KeyFixed: null,
-    });
-    return;
+  if (tier !== "enterprise") {
+    await refundObject(db, { ownerType, ownerId });
   }
 
   const now = new Date();
   const parentDir = message.r2Key.replace(/\/[^/]+\/[^/]+$/, ""); // strip "/<packageId>/original.ext"
 
   const newPackages: { id: string; r2Key: string }[] = [];
+  let quotaExhausted = false;
   for (const name of innerNames) {
+    if (quotaExhausted) break;
+
     // decompressSingleEntry really inflates this one entry (unlike the
     // header-only scan that produced innerNames), so a corrupted inner
     // .zip throws here rather than returning null/empty. One bad inner
@@ -298,6 +303,18 @@ async function expandZipOfZips(
       continue;
     }
     if (!innerBytes || innerBytes.length === 0) continue;
+
+    if (tier !== "enterprise") {
+      const charge = await consumeObject(db, { ownerType, ownerId }, freeObjectLimit);
+      if (!charge.ok) {
+        // Ran out partway through -- stop expanding further inner
+        // packages rather than creating rows the owner can't afford to
+        // have processed. The ones already created above still go
+        // through normally.
+        quotaExhausted = true;
+        break;
+      }
+    }
 
     const newPackageId = crypto.randomUUID();
     const filename = name.split("/").pop() || name;
