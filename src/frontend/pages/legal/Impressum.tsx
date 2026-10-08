@@ -6,7 +6,7 @@ export default function Impressum() {
     <Layout>
       <section className="mx-auto max-w-2xl px-6 py-16 text-sm leading-relaxed text-slate-700">
         <h1 className="text-2xl font-bold text-slate-900">Impressum</h1>
-        <DraftBanner />
+        <DraftBanner hasPlaceholders={false} />
 
         <p className="mb-4">Angaben gemäß § 5 TMG:</p>
 
