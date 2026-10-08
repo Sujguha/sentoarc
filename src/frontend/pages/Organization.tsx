@@ -55,6 +55,12 @@ export default function Organization() {
   // an existing founder-only probe we reuse here rather than adding a
   // new endpoint just to expose this one boolean.
   const [isFounder, setIsFounder] = useState(false);
+  // Someone who already bought Enterprise Migration (unlimited objects)
+  // still can't self-serve-create an org -- that part stays founder-
+  // provisioned -- but they've already paid, so they get a "here's what
+  // to do next" message instead of the generic "go buy Enterprise" pitch
+  // shown to everyone else.
+  const [tier, setTier] = useState<string | null>(null);
 
   const loadOrgs = useCallback(async () => {
     const { data } = await authClient.organization.list();
@@ -89,6 +95,10 @@ export default function Organization() {
     fetch("/api/admin/ping")
       .then((res) => setIsFounder(res.ok))
       .catch(() => setIsFounder(false));
+    fetch("/api/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setTier((data as { tier?: string } | null)?.tier ?? null))
+      .catch(() => setTier(null));
   }, [loadOrgs, loadActive]);
 
   useEffect(() => {
@@ -241,6 +251,16 @@ export default function Organization() {
                 {t("organization.create")}
               </button>
             </form>
+          ) : tier === "enterprise" ? (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-sm text-slate-600">
+                {t("organization.enterpriseOwnerPrefix")}{" "}
+                <a href="/#contact" className="font-medium text-indigo-700 transition-colors hover:text-indigo-900">
+                  {t("organization.contactUs")}
+                </a>{" "}
+                {t("organization.toGetTeamSetUp")}
+              </p>
+            </div>
           ) : (
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-600">
