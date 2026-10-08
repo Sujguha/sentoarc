@@ -10,8 +10,8 @@ export default function Datenschutz() {
 
         <h2 className="mt-6 font-semibold text-slate-900">1. Controller</h2>
         <p className="mb-4">
-          [Your full legal name or company name], [address], [country] — contact for privacy matters:
-          [privacy-contact-email].
+          Sujoy Guha Consulting, Situlistraße 35, 80939 München, Deutschland — contact for privacy matters:
+          sujoy.guha@mnet-mail.de.
         </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">2. What data we process</h2>
@@ -45,7 +45,7 @@ export default function Datenschutz() {
         <ul className="mb-4 list-disc space-y-1 pl-5">
           <li>Cloudflare, Inc. — hosting, database, and file storage. Uploaded/fixed files are stored in R2 under Cloudflare's EU jurisdiction.</li>
           <li>Twilio SendGrid — transactional email (account verification, sign-in links).</li>
-          <li>Stripe, Inc. — payment processing for paid plans [once billing is live].</li>
+          <li>Stripe, Inc. — payment processing for paid plans.</li>
         </ul>
         <p className="mb-4">
           Some of these processors operate outside the EU/EEA for parts of their infrastructure (e.g. email
@@ -65,7 +65,7 @@ export default function Datenschutz() {
           Under the GDPR you have the right to access, rectify, erase, or restrict processing of your personal
           data, to data portability, and to object to processing based on legitimate interest. You can delete
           your account and all associated data yourself from your account settings, or contact us at
-          [privacy-contact-email]. You also have the right to lodge a complaint with your local data protection
+          sujoy.guha@mnet-mail.de. You also have the right to lodge a complaint with your local data protection
           supervisory authority.
         </p>
 
