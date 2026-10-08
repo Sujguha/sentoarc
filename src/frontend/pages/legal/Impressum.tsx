@@ -21,11 +21,7 @@ export default function Impressum() {
         </p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Kontakt</h2>
-        <p className="mb-4">
-          E-Mail: [your-contact-email]
-          <br />
-          Telefon: [optional — phone number]
-        </p>
+        <p className="mb-4">E-Mail: sujoy.guha@mnet-mail.de</p>
 
         <h2 className="mt-6 font-semibold text-slate-900">Umsatzsteuer-ID</h2>
         <p className="mb-4">
