@@ -48,7 +48,7 @@ FREE_RETENTION_HOURS = "24"
 PRO_RETENTION_DAYS = "30"
 ADMIN_EMAILS = "sujoy.guha2@gmail.com"
 APP_BASE_URL = "https://sentoarc.sujoy-guha2.workers.dev"
-SENDGRID_FROM_EMAIL = "sujoy.guha2@gmail.com"
+SENDGRID_FROM_EMAIL = "no-reply@sentoarc.de"
 SENDGRID_FROM_NAME = "SENtoArc"
 # One-time packs (Stripe Sandbox), self-serve via Checkout -- no
 # subscriptions, no pre-created Stripe Prices (inline price_data at
