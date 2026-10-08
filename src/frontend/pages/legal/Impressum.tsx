@@ -32,12 +32,6 @@ export default function Impressum() {
           [Your VAT identification number per § 27a UStG — not yet issued; omit this section until you have one]
         </p>
 
-        <h2 className="mt-6 font-semibold text-slate-900">Handelsregister</h2>
-        <p className="mb-4">
-          [Registration court and registration number, if your business is registered — omit if operating as a
-          sole proprietor without a trade register entry]
-        </p>
-
         <h2 className="mt-6 font-semibold text-slate-900">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
         <p className="mb-4">
           Sujoy Guha Consulting
