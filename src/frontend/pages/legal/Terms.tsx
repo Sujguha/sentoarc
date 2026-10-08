@@ -8,6 +8,11 @@ export default function Terms() {
         <h1 className="text-2xl font-bold text-slate-900">Terms</h1>
         <DraftBanner />
 
+        <p className="mb-4">
+          SENtoArc is operated by Sujoy Guha Consulting, Situlistraße 35, 80939 München, Deutschland — contact:
+          sujoy.guha@mnet-mail.de.
+        </p>
+
         <h2 className="mt-6 font-semibold text-slate-900">1. The service</h2>
         <p className="mb-4">
           SENtoArc ("we", "us") validates SCORM packages exported from SAP Enable Now and applies safe automatic
