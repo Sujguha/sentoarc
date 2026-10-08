@@ -104,8 +104,23 @@ const WALKME_LEARNING_ARC_URL = "https://app.learningarc.com/management/assets";
 // exists for error codes that never carry one. The server's own message
 // is always English (it's not user-facing copy the server localizes),
 // so this is a known gap for non-English users on those specific codes.
-function friendlyError(body: { error?: string; message?: string } | undefined, t: TFunction): string {
+//
+// package_too_large is a special case: the server never sets `message`
+// for it, but every such response does carry the real `maxBytes` it
+// checked against (and, for a bulk upload, which file tripped it) -- so
+// build the message from those rather than falling back to the generic,
+// number-free static string.
+function friendlyError(
+  body: { error?: string; message?: string; maxBytes?: number; filename?: string } | undefined,
+  t: TFunction
+): string {
   if (body?.message) return body.message;
+  if (body?.error === "package_too_large" && typeof body.maxBytes === "number") {
+    const limitMb = Math.round(body.maxBytes / (1024 * 1024));
+    return body.filename
+      ? t("appShell.errors.package_too_large_named", { filename: body.filename, limitMb })
+      : t("appShell.errors.package_too_large_sized", { limitMb });
+  }
   return (body?.error && t(`appShell.errors.${body.error}`, { defaultValue: "" })) || t("appShell.errors.generic");
 }
 
@@ -225,14 +240,20 @@ export default function AppShell() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name, sizeBytes: file.size }),
     });
-    const initBody = (await initRes.json()) as { error?: string; message?: string; jobId?: string; uploadUrl?: string };
+    const initBody = (await initRes.json()) as {
+      error?: string;
+      message?: string;
+      jobId?: string;
+      uploadUrl?: string;
+      maxBytes?: number;
+    };
     if (!initRes.ok || !initBody.uploadUrl || !initBody.jobId) {
       setUploadError(friendlyError(initBody, t));
       return;
     }
 
     const uploadRes = await fetch(initBody.uploadUrl, { method: "PUT", body: file });
-    const uploadBody = (await uploadRes.json()) as { error?: string; message?: string };
+    const uploadBody = (await uploadRes.json()) as { error?: string; message?: string; maxBytes?: number };
     if (!uploadRes.ok) {
       setUploadError(friendlyError(uploadBody, t));
       return;
@@ -252,6 +273,8 @@ export default function AppShell() {
       message?: string;
       jobId?: string;
       packages?: { packageId: string; filename: string; uploadUrl: string }[];
+      maxBytes?: number;
+      filename?: string;
     };
     if (!initRes.ok || !initBody.jobId || !initBody.packages) {
       setUploadError(friendlyError(initBody, t));
@@ -264,7 +287,7 @@ export default function AppShell() {
       initBody.packages.map(async (p, i) => {
         const res = await fetch(p.uploadUrl, { method: "PUT", body: files[i] });
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string; maxBytes?: number };
           setUploadError(friendlyError(body, t));
         }
       })
@@ -362,6 +385,8 @@ export default function AppShell() {
               {t("appShell.hintBulk")}
             </p>
           )}
+          {/* Static text, not fetched -- must match wrangler.toml's MAX_PACKAGE_SIZE_BYTES/MAX_VIDEO_SIZE_BYTES. */}
+          {!isViewer && <p className="mt-1 text-xs text-slate-400">{t("appShell.sizeLimitHint")}</p>}
           {selectedFile && !uploadError && (
             <p className="mt-3 text-sm text-slate-500">
               {selectedFileCount > 1 ? t("appShell.filesSelected", { count: selectedFileCount }) : selectedFile.name}
