@@ -84,6 +84,7 @@
   },
   "pricing": {
     "title": "Preise",
+    "comingSoon": "Demnächst verfügbar",
     "tiers": {
       "free": {
         "name": "Free / Proof",
@@ -235,6 +236,7 @@
     "buyEnterprise": "Enterprise Migration kaufen (1.999 €, unbegrenzt)",
     "redirecting": "Weiterleitung…",
     "checkoutFailed": "Checkout konnte nicht gestartet werden — bitte erneut versuchen.",
+    "paidPlansComingSoon": "Kostenpflichtige Tarife folgen in Kürze. Free ist bereits verfügbar.",
     "billingHistory": "Zahlungsverlauf",
     "noPurchases": "Noch keine Käufe.",
     "downloadInvoice": "Rechnung herunterladen",

@@ -84,6 +84,7 @@
   },
   "pricing": {
     "title": "Pricing",
+    "comingSoon": "Coming soon",
     "tiers": {
       "free": {
         "name": "Free / Proof",
@@ -235,6 +236,7 @@
     "buyEnterprise": "Buy Enterprise Migration (€1,999, unlimited)",
     "redirecting": "Redirecting…",
     "checkoutFailed": "Couldn't start checkout — please try again.",
+    "paidPlansComingSoon": "Paid plans are coming soon. Free is live now.",
     "billingHistory": "Billing history",
     "noPurchases": "No purchases yet.",
     "downloadInvoice": "Download invoice",

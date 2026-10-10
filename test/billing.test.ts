@@ -244,6 +244,14 @@ describe("POST /api/billing/checkout-pack", () => {
   });
 });
 
+describe("GET /api/billing/config", () => {
+  it("reports paid plans as disabled during the soft launch", async () => {
+    const res = await SELF.fetch("https://example.com/api/billing/config");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ paidPlansEnabled: false });
+  });
+});
+
 describe("listPurchases", () => {
   it("returns only this owner's purchases, newest first", async () => {
     const db = createDb(env.DB);

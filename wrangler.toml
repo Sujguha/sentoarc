@@ -56,6 +56,10 @@ SENDGRID_FROM_NAME = "SENtoArc"
 PROJECT_PACK_PRICE_CENTS = "49900"
 PROJECT_PACK_OBJECTS = "100"
 ENTERPRISE_PACK_PRICE_CENTS = "199900"
+# Soft launch (2026-10-10): Free only. Flip to "true" once the Stripe
+# webhook delivery issue is confirmed fixed -- see PAID_PLANS_ENABLED
+# in src/types/env.d.ts.
+PAID_PLANS_ENABLED = "false"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET

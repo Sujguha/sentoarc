@@ -33,6 +33,11 @@ export interface Env {
   PROJECT_PACK_PRICE_CENTS: string;
   PROJECT_PACK_OBJECTS: string;
   ENTERPRISE_PACK_PRICE_CENTS: string;
+  // Soft-launch kill switch: "false" takes Project Pack / Enterprise
+  // Migration checkout offline (both the API and the UI) while Free
+  // stays fully live -- flip to "true" once the Stripe webhook
+  // delivery issue is confirmed fixed. See POST /checkout-pack.
+  PAID_PLANS_ENABLED: string;
 }
 
 export type ProcessingQueueMessage = { type: "process"; jobId: string; packageId: string; r2Key: string };

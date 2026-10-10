@@ -31,6 +31,13 @@ export async function listPurchases(db: ReturnType<typeof createDb>, ownerId: st
     .orderBy(desc(packPurchase.createdAt));
 }
 
+// Lets the frontend (Account, Pricing) show "coming soon" instead of a
+// live buy button without duplicating the kill switch's value -- not
+// sensitive, so no auth needed.
+billingRoute.get("/config", async (c) => {
+  return c.json({ paidPlansEnabled: c.env.PAID_PLANS_ENABLED === "true" });
+});
+
 billingRoute.get("/purchases", requireAuth, async (c) => {
   const user = c.get("user");
   const db = createDb(c.env.DB);
@@ -93,6 +100,10 @@ function packProductName(packTier: PackTier): string {
 // correct for a fixed amount as it was for the old pay-as-you-go top-up's
 // customer-chosen one.
 billingRoute.post("/checkout-pack", requireAuth, async (c) => {
+  if (c.env.PAID_PLANS_ENABLED !== "true") {
+    return c.json({ error: "coming_soon" }, 403);
+  }
+
   const user = c.get("user");
   const body = await c.req.json<{ packTier?: string }>().catch(() => null);
   const packTier = body?.packTier;

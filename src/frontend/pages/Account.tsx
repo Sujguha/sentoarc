@@ -52,6 +52,7 @@ export default function Account() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [stats, setStats] = useState<ProcessingStats | null>(null);
   const [purchases, setPurchases] = useState<Purchase[] | null>(null);
+  const [paidPlansEnabled, setPaidPlansEnabled] = useState(false);
   const [billingBusy, setBillingBusy] = useState<"project_pack" | "enterprise" | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
@@ -77,6 +78,10 @@ export default function Account() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setPurchases((data as { purchases: Purchase[] } | null)?.purchases ?? []))
       .catch(() => setPurchases([]));
+    fetch("/api/billing/config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setPaidPlansEnabled((data as { paidPlansEnabled?: boolean } | null)?.paidPlansEnabled ?? false))
+      .catch(() => setPaidPlansEnabled(false));
   }, []);
 
   async function buyPack(packTier: "project_pack" | "enterprise") {
@@ -220,22 +225,26 @@ export default function Account() {
               </p>
 
               {usage.tier !== "enterprise" && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => buyPack("project_pack")}
-                    disabled={billingBusy !== null}
-                    className={button("primary", "md")}
-                  >
-                    {billingBusy === "project_pack" ? t("account.redirecting") : t("account.buyProjectPack")}
-                  </button>
-                  <button
-                    onClick={() => buyPack("enterprise")}
-                    disabled={billingBusy !== null}
-                    className={button("secondary", "md")}
-                  >
-                    {billingBusy === "enterprise" ? t("account.redirecting") : t("account.buyEnterprise")}
-                  </button>
-                </div>
+                paidPlansEnabled ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => buyPack("project_pack")}
+                      disabled={billingBusy !== null}
+                      className={button("primary", "md")}
+                    >
+                      {billingBusy === "project_pack" ? t("account.redirecting") : t("account.buyProjectPack")}
+                    </button>
+                    <button
+                      onClick={() => buyPack("enterprise")}
+                      disabled={billingBusy !== null}
+                      className={button("secondary", "md")}
+                    >
+                      {billingBusy === "enterprise" ? t("account.redirecting") : t("account.buyEnterprise")}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">{t("account.paidPlansComingSoon")}</p>
+                )
               )}
 
               {billingError && <p className="mt-3 text-sm text-red-600">{billingError}</p>}

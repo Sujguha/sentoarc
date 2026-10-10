@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
@@ -14,6 +15,14 @@ const TIER_META: Record<TierId, { price: string; to: string; highlighted?: boole
 
 export default function Pricing() {
   const { t } = useTranslation();
+  const [paidPlansEnabled, setPaidPlansEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/billing/config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setPaidPlansEnabled((data as { paidPlansEnabled?: boolean } | null)?.paidPlansEnabled ?? false))
+      .catch(() => setPaidPlansEnabled(false));
+  }, []);
 
   return (
     <Layout>
@@ -44,9 +53,15 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <Link to={meta.to} className={`mt-6 w-full ${button(meta.highlighted ? "primary" : "secondary", "md")}`}>
-                  {t(`pricing.tiers.${id}.cta`)}
-                </Link>
+                {id !== "free" && !paidPlansEnabled ? (
+                  <span className={`mt-6 block w-full cursor-default text-center opacity-50 ${button("secondary", "md")}`}>
+                    {t("pricing.comingSoon")}
+                  </span>
+                ) : (
+                  <Link to={meta.to} className={`mt-6 w-full ${button(meta.highlighted ? "primary" : "secondary", "md")}`}>
+                    {t(`pricing.tiers.${id}.cta`)}
+                  </Link>
+                )}
               </div>
             );
           })}
