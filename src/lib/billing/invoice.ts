@@ -2,12 +2,17 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 // Seller details for invoices -- not secrets, so plain constants rather
 // than env vars (same reasoning as the hardcoded pack names in
-// billing.ts). No VAT ID yet: omitted rather than guessed at, per
-// Sujoy's instruction, until one is issued.
+// billing.ts).
 const SELLER_NAME = "Sujoy Guha Consulting";
 const SELLER_SERVICE_NAME = "SENtoArc";
 const SELLER_ADDRESS_LINES = ["Situlistraße 35", "80939 München", "Germany"];
 const SELLER_EMAIL = "no-reply@sentoarc.de";
+// Freelance Steuernummer (not a VAT/USt-IdNr -- Sujoy doesn't have one),
+// per the standard §14 UStG requirement that an invoice carry either a
+// VAT ID or a tax number. Distinct from the Wirtschafts-Identifikationsnummer
+// shown on the Impressum, which identifies the business publicly without
+// exposing this number.
+const SELLER_STEUERNUMMER = "147/163/31270";
 
 const PACK_LABEL: Record<"project_pack" | "enterprise", string> = {
   project_pack: "SENtoArc Project Pack (100 objects)",
@@ -62,6 +67,8 @@ export async function generateInvoicePdf(purchase: InvoicePurchase, customerEmai
     y -= 13;
   }
   text(SELLER_EMAIL, margin, 10);
+  y -= 13;
+  text(`Steuernummer: ${SELLER_STEUERNUMMER}`, margin, 10);
   y -= 28;
 
   text("Bill to", margin, 10, bold);

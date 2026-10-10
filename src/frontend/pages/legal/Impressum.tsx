@@ -23,6 +23,9 @@ export default function Impressum() {
         <h2 className="mt-6 font-semibold text-slate-900">Kontakt</h2>
         <p className="mb-4">E-Mail: sujoy.guha@mnet-mail.de</p>
 
+        <h2 className="mt-6 font-semibold text-slate-900">Wirtschafts-Identifikationsnummer</h2>
+        <p className="mb-4">DE465568806-00001</p>
+
         <h2 className="mt-6 font-semibold text-slate-900">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
         <p className="mb-4">
           Sujoy Guha Consulting
