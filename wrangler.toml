@@ -60,10 +60,10 @@ ENTERPRISE_PACK_PRICE_CENTS = "199900"
 # webhook delivery issue is confirmed fixed -- see PAID_PLANS_ENABLED
 # in src/types/env.d.ts.
 PAID_PLANS_ENABLED = "false"
-# Cloudflare Turnstile on sign-up / sign-in / magic-link request. "false"
-# until the widget is created and TURNSTILE_SITE_KEY + the
-# TURNSTILE_SECRET_KEY secret are both set -- see src/lib/auth/index.ts.
-TURNSTILE_ENABLED = "false"
+# Cloudflare Turnstile on sign-up / sign-in / magic-link request --
+# widget created, TURNSTILE_SECRET_KEY set via the dashboard. See
+# src/lib/auth/index.ts.
+TURNSTILE_ENABLED = "true"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFUVhBI1ddEECbqZ"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
