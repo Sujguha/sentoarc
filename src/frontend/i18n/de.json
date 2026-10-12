@@ -145,6 +145,8 @@
     "confirmPasswordPlaceholder": "Passwort bestätigen",
     "emailMismatch": "Die E-Mail-Adressen stimmen nicht überein.",
     "passwordMismatch": "Die Passwörter stimmen nicht überein.",
+    "passwordRequirements": "Muss mehr als 8 Zeichen enthalten, mit einem Großbuchstaben, einer Zahl und einem Sonderzeichen.",
+    "passwordTooWeak": "Das Passwort muss mehr als 8 Zeichen enthalten, mit einem Großbuchstaben, einer Zahl und einem Sonderzeichen.",
     "submit": "Registrieren",
     "submitting": "Konto wird erstellt…",
     "haveAccount": "Bereits ein Konto?",

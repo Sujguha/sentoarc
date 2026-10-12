@@ -1,12 +1,24 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, organization, captcha } from "better-auth/plugins";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { createDb } from "../db/client";
 import { sendEmail } from "../email/sendgrid";
 import { logAudit } from "../audit";
 import { orgAccessControl, orgRoles } from "../org-access-control";
 import { isFounderEmail } from "../founder-access";
 import type { Env } from "../../types/env";
+
+// Mirrors the client-side check in SignUp.tsx -- enforced here too since
+// the UI check alone can be bypassed by calling the API directly.
+// "More than 8 characters" -> minimum 9.
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{9,}$/;
+// Path -> the body field holding the new/raw password on that endpoint.
+const PASSWORD_FIELD_BY_PATH: Record<string, string> = {
+  "/sign-up/email": "password",
+  "/reset-password": "newPassword",
+  "/change-password": "newPassword",
+};
 
 export function createAuth(env: Env) {
   const db = createDb(env.DB);
@@ -142,6 +154,19 @@ export function createAuth(env: Env) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
+    },
+
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        const field = PASSWORD_FIELD_BY_PATH[ctx.path];
+        if (!field) return;
+        const password = (ctx.body as Record<string, unknown> | undefined)?.[field];
+        if (typeof password === "string" && !PASSWORD_COMPLEXITY_REGEX.test(password)) {
+          throw new APIError("BAD_REQUEST", {
+            message: "Password must be more than 8 characters and include an uppercase letter, a number, and a special character.",
+          });
+        }
+      }),
     },
 
     emailVerification: {

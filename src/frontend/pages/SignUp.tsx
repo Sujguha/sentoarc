@@ -7,6 +7,11 @@ import { Turnstile } from "../components/Turnstile";
 import { authClient } from "../lib/auth-client";
 import { button, input as inputClass } from "../lib/ui";
 
+// Mirrors the server-side check in src/lib/auth/index.ts -- this check
+// alone can be bypassed by calling the API directly, so it's enforced
+// there too. "More than 8 characters" -> minimum 9.
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{9,}$/;
+
 export default function SignUp() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -38,6 +43,10 @@ export default function SignUp() {
     }
     if (password !== confirmPassword) {
       setError(t("signUp.passwordMismatch"));
+      return;
+    }
+    if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
+      setError(t("signUp.passwordTooWeak"));
       return;
     }
 
@@ -75,8 +84,9 @@ export default function SignUp() {
             className={inputClass()}
             onPaste={(e) => e.preventDefault()}
           />
-          <PasswordInput name="password" required minLength={8} placeholder={t("signIn.tabPassword")} />
-          <PasswordInput name="confirmPassword" required minLength={8} placeholder={t("signUp.confirmPasswordPlaceholder")} />
+          <PasswordInput name="password" required minLength={9} placeholder={t("signIn.tabPassword")} />
+          <PasswordInput name="confirmPassword" required minLength={9} placeholder={t("signUp.confirmPasswordPlaceholder")} />
+          <p className="text-xs text-slate-500">{t("signUp.passwordRequirements")}</p>
           {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onVerify={setCaptchaToken} />}
           <button
             type="submit"

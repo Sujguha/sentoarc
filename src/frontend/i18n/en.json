@@ -145,6 +145,8 @@
     "confirmPasswordPlaceholder": "Confirm password",
     "emailMismatch": "Email addresses don't match.",
     "passwordMismatch": "Passwords don't match.",
+    "passwordRequirements": "Must be more than 8 characters and include an uppercase letter, a number, and a special character.",
+    "passwordTooWeak": "Password must be more than 8 characters and include an uppercase letter, a number, and a special character.",
     "submit": "Sign up",
     "submitting": "Creating account…",
     "haveAccount": "Already have an account?",
