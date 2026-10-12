@@ -8,6 +8,13 @@ directory = "./dist/client"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+# Cloudflare-managed Custom Domain: DNS + SSL cert are provisioned and
+# kept in sync automatically, no manual CNAME/A record needed -- the
+# zone just has to be Active in Cloudflare first (it is).
+[[routes]]
+pattern = "sentoarc.de"
+custom_domain = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "sentoarc-db"
@@ -47,7 +54,12 @@ MAX_VIDEO_SIZE_BYTES = "524288000"
 FREE_RETENTION_HOURS = "24"
 PRO_RETENTION_DAYS = "30"
 ADMIN_EMAILS = "sujoy.guha2@gmail.com"
-APP_BASE_URL = "https://sentoarc.sujoy-guha2.workers.dev"
+# Canonical URL -- used in email links (verification, magic-link,
+# invitations), Stripe Checkout success/cancel redirects, and
+# better-auth's trustedOrigins. The workers.dev URL still works for
+# serving the app (nothing removes that), just not as the identity
+# this app presents to users or external services anymore.
+APP_BASE_URL = "https://sentoarc.de"
 SENDGRID_FROM_EMAIL = "no-reply@sentoarc.de"
 SENDGRID_FROM_NAME = "SENtoArc"
 # One-time packs (Stripe Sandbox), self-serve via Checkout -- no
