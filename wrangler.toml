@@ -64,7 +64,7 @@ PAID_PLANS_ENABLED = "false"
 # until the widget is created and TURNSTILE_SITE_KEY + the
 # TURNSTILE_SECRET_KEY secret are both set -- see src/lib/auth/index.ts.
 TURNSTILE_ENABLED = "false"
-TURNSTILE_SITE_KEY = ""
+TURNSTILE_SITE_KEY = "0x4AAAAAAFUVhBI1ddEECbqZ"
 
 # Secrets (set via `wrangler secret put <NAME>`, never committed):
 #   BETTER_AUTH_SECRET
