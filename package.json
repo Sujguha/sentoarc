@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.6.4",
-    "@cloudflare/workers-types": "^4.20241127.0",
+    "@cloudflare/workers-types": "^5.20261012.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
@@ -44,6 +44,6 @@
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^2.1.6",
-    "wrangler": "^3.91.0"
+    "wrangler": "^4.149.0"
   }
 }
