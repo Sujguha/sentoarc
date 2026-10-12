@@ -147,28 +147,13 @@ export function createAuth(env: Env) {
     emailVerification: {
       sendOnSignUp: true,
       sendVerificationEmail: async ({ user, url }) => {
-        // better-auth runs this through runInBackgroundOrAwait, which
-        // catches and only logs via its own internal logger -- a thrown
-        // error here never reaches the signup response or the client.
-        // Logging it ourselves, with a distinctive, greppable prefix, is
-        // the only way to see it (temporary, while tracking down why
-        // verification emails aren't sending -- see SENTOARC_SIGNUP_EMAIL_ERROR
-        // in Cloudflare Logs once reproduced).
-        try {
-          await sendEmail(env.SENDGRID_API_KEY, {
-            to: user.email,
-            fromEmail: env.SENDGRID_FROM_EMAIL,
-            fromName: env.SENDGRID_FROM_NAME,
-            subject: "Verify your SENtoArc account",
-            html: `<p>Confirm your email to finish setting up your SENtoArc account.</p><p><a href="${url}">Verify email</a></p>`,
-          });
-        } catch (err) {
-          console.error(
-            "SENTOARC_SIGNUP_EMAIL_ERROR",
-            JSON.stringify({ userEmail: user.email, message: err instanceof Error ? err.message : String(err) })
-          );
-          throw err;
-        }
+        await sendEmail(env.SENDGRID_API_KEY, {
+          to: user.email,
+          fromEmail: env.SENDGRID_FROM_EMAIL,
+          fromName: env.SENDGRID_FROM_NAME,
+          subject: "Verify your SENtoArc account",
+          html: `<p>Confirm your email to finish setting up your SENtoArc account.</p><p><a href="${url}">Verify email</a></p>`,
+        });
       },
     },
 
