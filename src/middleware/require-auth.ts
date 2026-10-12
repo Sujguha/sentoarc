@@ -15,7 +15,13 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
     email: session.user.email,
     name: session.user.name,
   });
-  c.set("activeOrganizationId", session.session.activeOrganizationId ?? null);
+  // The organization plugin (unconditional -- see auth/index.ts) adds
+  // activeOrganizationId to the session row at runtime; TypeScript loses
+  // that augmentation here only because createAuth's plugins array also
+  // conditionally spreads in the captcha plugin, which widens the whole
+  // array's inferred type from a tuple to a looser union.
+  const activeOrganizationId = (session.session as typeof session.session & { activeOrganizationId?: string | null }).activeOrganizationId;
+  c.set("activeOrganizationId", activeOrganizationId ?? null);
 
   await next();
 });

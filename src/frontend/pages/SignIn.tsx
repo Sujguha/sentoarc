@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Layout } from "../components/Layout";
 import { PasswordInput } from "../components/PasswordInput";
+import { Turnstile } from "../components/Turnstile";
 import { authClient } from "../lib/auth-client";
 import { button, input as inputClass } from "../lib/ui";
 
@@ -20,6 +21,20 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/public-config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setTurnstileSiteKey((data as { turnstileSiteKey?: string | null } | null)?.turnstileSiteKey ?? null))
+      .catch(() => setTurnstileSiteKey(null));
+  }, []);
+
+  function switchMode(newMode: "password" | "magic-link") {
+    setMode(newMode);
+    setCaptchaToken(null);
+  }
 
   async function handlePasswordSignIn(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -27,10 +42,13 @@ export default function SignIn() {
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
 
-    const { error: signInError } = await authClient.signIn.email({
-      email: String(form.get("email") ?? ""),
-      password: String(form.get("password") ?? ""),
-    });
+    const { error: signInError } = await authClient.signIn.email(
+      {
+        email: String(form.get("email") ?? ""),
+        password: String(form.get("password") ?? ""),
+      },
+      captchaToken ? { headers: { "x-captcha-response": captchaToken } } : undefined
+    );
 
     setSubmitting(false);
     if (signInError) {
@@ -46,10 +64,13 @@ export default function SignIn() {
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
 
-    const { error: magicLinkError } = await authClient.signIn.magicLink({
-      email: String(form.get("email") ?? ""),
-      callbackURL: next,
-    });
+    const { error: magicLinkError } = await authClient.signIn.magicLink(
+      {
+        email: String(form.get("email") ?? ""),
+        callbackURL: next,
+      },
+      captchaToken ? { headers: { "x-captcha-response": captchaToken } } : undefined
+    );
 
     setSubmitting(false);
     if (magicLinkError) {
@@ -65,13 +86,13 @@ export default function SignIn() {
         <h1 className="text-2xl font-bold text-slate-900">{t("signIn.title")}</h1>
         <div className="mt-4 flex gap-4 text-sm">
           <button
-            onClick={() => setMode("password")}
+            onClick={() => switchMode("password")}
             className={`transition-colors ${mode === "password" ? "font-semibold text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
           >
             {t("signIn.tabPassword")}
           </button>
           <button
-            onClick={() => setMode("magic-link")}
+            onClick={() => switchMode("magic-link")}
             className={`transition-colors ${mode === "magic-link" ? "font-semibold text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
           >
             {t("signIn.tabMagicLink")}
@@ -82,7 +103,12 @@ export default function SignIn() {
           <form onSubmit={handlePasswordSignIn} className="mt-6 space-y-4">
             <input name="email" required type="email" placeholder={t("signIn.emailPlaceholder")} className={inputClass()} />
             <PasswordInput name="password" required placeholder={t("signIn.tabPassword")} />
-            <button type="submit" disabled={submitting} className={`w-full ${button("primary", "md")}`}>
+            {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onVerify={setCaptchaToken} />}
+            <button
+              type="submit"
+              disabled={submitting || (turnstileSiteKey !== null && !captchaToken)}
+              className={`w-full ${button("primary", "md")}`}
+            >
               {submitting ? t("signIn.submitting") : t("signIn.submit")}
             </button>
           </form>
@@ -91,7 +117,12 @@ export default function SignIn() {
         ) : (
           <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
             <input name="email" required type="email" placeholder={t("signIn.emailPlaceholder")} className={inputClass()} />
-            <button type="submit" disabled={submitting} className={`w-full ${button("primary", "md")}`}>
+            {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onVerify={setCaptchaToken} />}
+            <button
+              type="submit"
+              disabled={submitting || (turnstileSiteKey !== null && !captchaToken)}
+              className={`w-full ${button("primary", "md")}`}
+            >
               {submitting ? t("signIn.sending") : t("signIn.sendLink")}
             </button>
           </form>

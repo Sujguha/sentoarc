@@ -38,6 +38,14 @@ export interface Env {
   // stays fully live -- flip to "true" once the Stripe webhook
   // delivery issue is confirmed fixed. See POST /checkout-pack.
   PAID_PLANS_ENABLED: string;
+  // Cloudflare Turnstile on sign-up, password sign-in, and magic-link
+  // request (see auth/index.ts). "false" until a widget is created and
+  // both keys below are set -- auth works exactly as before with it off.
+  TURNSTILE_ENABLED: string;
+  // Public by design (embedded in every page that renders the widget) --
+  // safe to read back from GET /api/public-config.
+  TURNSTILE_SITE_KEY: string;
+  TURNSTILE_SECRET_KEY: string;
 }
 
 export type ProcessingQueueMessage = { type: "process"; jobId: string; packageId: string; r2Key: string };

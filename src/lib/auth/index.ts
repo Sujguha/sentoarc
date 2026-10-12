@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { magicLink, organization } from "better-auth/plugins";
+import { magicLink, organization, captcha } from "better-auth/plugins";
 import { createDb } from "../db/client";
 import { sendEmail } from "../email/sendgrid";
 import { logAudit } from "../audit";
@@ -11,39 +11,12 @@ import type { Env } from "../../types/env";
 export function createAuth(env: Env) {
   const db = createDb(env.DB);
 
-  return betterAuth({
-    database: drizzleAdapter(db, { provider: "sqlite" }),
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.APP_BASE_URL,
-    trustedOrigins: [env.APP_BASE_URL],
-
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: true,
-    },
-
-    emailVerification: {
-      sendOnSignUp: true,
-      sendVerificationEmail: async ({ user, url }) => {
-        await sendEmail(env.SENDGRID_API_KEY, {
-          to: user.email,
-          fromEmail: env.SENDGRID_FROM_EMAIL,
-          fromName: env.SENDGRID_FROM_NAME,
-          subject: "Verify your SENtoArc account",
-          html: `<p>Confirm your email to finish setting up your SENtoArc account.</p><p><a href="${url}">Verify email</a></p>`,
-        });
-      },
-    },
-
-    // Workers' built-in Rate Limiting binding guards these endpoints too
-    // (added in Phase 1 wrangler config once abuse patterns are observed).
-    rateLimit: {
-      enabled: true,
-      window: 60,
-      max: 10,
-    },
-
-    plugins: [
+  // A single array literal (vs. building it up with .push) so TypeScript
+  // infers the exact plugin set from this one expression -- the
+  // organization plugin's session-field augmentation (activeOrganizationId,
+  // used in require-auth.ts) depends on that precise inference and is lost
+  // if the array is typed or assembled any more loosely than this.
+  const plugins = [
       magicLink({
         sendMagicLink: async ({ email, url }) => {
           await sendEmail(env.SENDGRID_API_KEY, {
@@ -144,7 +117,55 @@ export function createAuth(env: Env) {
           },
         },
       }),
-    ],
+      // Off until a Turnstile widget exists and both keys are set (see
+      // TURNSTILE_ENABLED in env.d.ts) -- auth works unchanged with it
+      // off. Spread into this same array literal, not pushed after the
+      // fact, so TypeScript's inference of the plugin set (see note
+      // above) still covers this branch too.
+      ...(env.TURNSTILE_ENABLED === "true"
+        ? [
+            captcha({
+              provider: "cloudflare-turnstile" as const,
+              secretKey: env.TURNSTILE_SECRET_KEY,
+              endpoints: ["/sign-up/email", "/sign-in/email", "/sign-in/magic-link"],
+            }),
+          ]
+        : []),
+  ];
+
+  return betterAuth({
+    database: drizzleAdapter(db, { provider: "sqlite" }),
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.APP_BASE_URL,
+    trustedOrigins: [env.APP_BASE_URL],
+
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+    },
+
+    emailVerification: {
+      sendOnSignUp: true,
+      sendVerificationEmail: async ({ user, url }) => {
+        await sendEmail(env.SENDGRID_API_KEY, {
+          to: user.email,
+          fromEmail: env.SENDGRID_FROM_EMAIL,
+          fromName: env.SENDGRID_FROM_NAME,
+          subject: "Verify your SENtoArc account",
+          html: `<p>Confirm your email to finish setting up your SENtoArc account.</p><p><a href="${url}">Verify email</a></p>`,
+        });
+      },
+    },
+
+    // Workers' built-in Rate Limiting binding guards these endpoints too
+    // (added in Phase 1 wrangler config once abuse patterns are observed).
+    rateLimit: {
+      enabled: true,
+      window: 60,
+      max: 10,
+    },
+
+    plugins,
   });
 }
 
