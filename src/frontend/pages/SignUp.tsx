@@ -25,14 +25,29 @@ export default function SignUp() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
     const form = new FormData(e.currentTarget);
+
+    const email = String(form.get("email") ?? "");
+    const confirmEmail = String(form.get("confirmEmail") ?? "");
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+
+    if (email.toLowerCase() !== confirmEmail.toLowerCase()) {
+      setError(t("signUp.emailMismatch"));
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError(t("signUp.passwordMismatch"));
+      return;
+    }
+
+    setSubmitting(true);
 
     const { error: signUpError } = await authClient.signUp.email(
       {
         name: String(form.get("name") ?? ""),
-        email: String(form.get("email") ?? ""),
-        password: String(form.get("password") ?? ""),
+        email,
+        password,
       },
       captchaToken ? { headers: { "x-captcha-response": captchaToken } } : undefined
     );
@@ -52,7 +67,16 @@ export default function SignUp() {
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <input name="name" required placeholder={t("signUp.namePlaceholder")} className={inputClass()} />
           <input name="email" required type="email" placeholder={t("signUp.emailPlaceholder")} className={inputClass()} />
+          <input
+            name="confirmEmail"
+            required
+            type="email"
+            placeholder={t("signUp.confirmEmailPlaceholder")}
+            className={inputClass()}
+            onPaste={(e) => e.preventDefault()}
+          />
           <PasswordInput name="password" required minLength={8} placeholder={t("signIn.tabPassword")} />
+          <PasswordInput name="confirmPassword" required minLength={8} placeholder={t("signUp.confirmPasswordPlaceholder")} />
           {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onVerify={setCaptchaToken} />}
           <button
             type="submit"
